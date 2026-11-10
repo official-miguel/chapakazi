@@ -1,12 +1,14 @@
-import { BookOpen, Check, ChevronDown, Home, Lock, Menu, Mic, Package, Users, WifiOff } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, CloudUpload, Home, Lock, Menu, Mic, Package, Users, WifiOff } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useI18n } from '../i18n'
 import type { WordKey } from '../i18n'
 import { useSession } from '../session'
 import type { View } from '../session'
+import { useSyncState } from '../sync'
 import { useToast } from '../toast'
 import { useOnline } from '../useOnline'
+import { usePendingCount } from './BackupCard'
 import { Sheet } from './Sheet'
 
 const tabs: { to: string; label: WordKey; icon: typeof Home }[] = [
@@ -23,6 +25,8 @@ export function Layout() {
   const online = useOnline()
   const { dir, person, view, business, views, lock, switchTo } = useSession()
   const [switching, setSwitching] = useState(false)
+  const sync = useSyncState()
+  const pending = usePendingCount()
 
   if (!person || !view) return null
 
@@ -45,10 +49,17 @@ export function Layout() {
           </span>
           <ChevronDown size={20} aria-hidden />
         </button>
-        {!online && (
+        {!online ? (
           <span className="pill pill-warn">
             <WifiOff size={14} aria-hidden /> {t('status.offline')}
           </span>
+        ) : (
+          sync.signedIn &&
+          pending > 0 && (
+            <NavLink to="/more" className="pill pill-quiet" aria-label={t('backup.pending', { n: pending })}>
+              <CloudUpload size={14} aria-hidden /> {pending}
+            </NavLink>
+          )
         )}
       </header>
 

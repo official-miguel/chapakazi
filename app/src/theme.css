@@ -1226,6 +1226,33 @@ a.btn {
   text-align: center;
 }
 
+/* Backup and accounts */
+.gate-center .gate-second {
+  margin-top: 12px;
+}
+
+.card .btn {
+  margin-top: 14px;
+}
+
+.card-note {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.pill-quiet {
+  background: var(--surface);
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.worker-card > .link-btn {
+  display: block;
+  margin: 4px 0 0 58px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

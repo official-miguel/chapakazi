@@ -1,5 +1,6 @@
 import { ChevronRight, Lock, Store, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { BackupCard } from '../components/BackupCard'
 import { useI18n } from '../i18n'
 import type { Lang } from '../i18n'
 import { useSession } from '../session'
@@ -37,6 +38,8 @@ export function MoreScreen() {
           </Link>
         </div>
       )}
+
+      <BackupCard />
 
       <section className="card">
         <h2 className="card-title">{t('more.language')}</h2>

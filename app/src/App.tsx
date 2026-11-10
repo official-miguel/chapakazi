@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { I18nProvider } from './i18n'
@@ -13,6 +14,7 @@ import { DebtsScreen } from './screens/DebtsScreen'
 import { StockScreen } from './screens/StockScreen'
 import { WorkersScreen } from './screens/WorkersScreen'
 import { SessionProvider, useSession } from './session'
+import { startSync } from './sync'
 import { ToastProvider } from './toast'
 
 /** Decides what the person sees: first-time setup, the lock screen, or the app itself. */
@@ -42,6 +44,8 @@ function Gate() {
 }
 
 export default function App() {
+  useEffect(() => startSync(), [])
+
   return (
     <I18nProvider>
       <ToastProvider>

@@ -84,6 +84,17 @@ export async function inviteCodeMatches(personId: string, code: string): Promise
   return rows.some((m) => !m.removedAt && m.inviteCode !== undefined && m.inviteCode === cleaned)
 }
 
+/** The person this phone belongs to chooses their PIN. No invite code is needed on their own phone. */
+export async function setOwnPin(personId: string, pin: string): Promise<void> {
+  const hashed = await hashPin(pin)
+  await db.people.update(personId, { ...hashed, updatedAt: Date.now() })
+}
+
+/** Gives a worker a fresh invite code, for a new or replaced phone. Their old phone stops syncing once they join. */
+export async function renewInvite(membershipId: string): Promise<void> {
+  await db.memberships.update(membershipId, { inviteCode: newInviteCode(), updatedAt: Date.now() })
+}
+
 export async function setFirstPin(personId: string, code: string, pin: string): Promise<boolean> {
   if (!(await inviteCodeMatches(personId, code))) return false
   const hashed = await hashPin(pin)

@@ -4,15 +4,16 @@ A simple business ledger for small shops in Kenya. It replaces the notebook: sal
 
 ## What works today
 
-Everything below is saved on the device only. Backup and sync between phones is the next piece.
+Everything is saved on the device first, so it works with no internet. With an account it also backs up and syncs between phones.
 
 - **Roles:** an owner with one or more businesses, and workers who each see one shop. PIN lock per person.
 - **Ledger:** sales and expenses, a day-by-day list, and edits that keep the full history. Nothing is erased.
 - **Stock:** items in any unit, stock that follows every sale, low-stock warnings. Buying prices are owner-only.
 - **Debts:** credit against named customers, part-payments, credit-limit warnings, WhatsApp and SMS reminders.
 - **Owner alerts:** quiet notes when a worker lowers an amount late, deletes late, or passes a credit limit.
+- **Backup and sync:** owners sign in with email and password; workers link their own phone with an invite code. If two phones change the same record, the later phone time wins and both edits stay in the history.
 
-Not built yet: sync and hosting, M-Pesa (Daraja), voice entry, analysis and reports.
+Not built yet: hosting on a public address, password reset, M-Pesa (Daraja), voice entry, analysis and reports.
 
 ## Run it
 
@@ -36,5 +37,8 @@ Then open the address it prints (usually http://localhost:5173).
 | `app/src/components` | Forms, sheets and list rows shared by screens |
 | `app/src/db.ts` | The on-device database and what each record contains |
 | `app/src/ledger.ts`, `stock.ts`, `customers.ts` | The rules for entries, stock and debts |
+| `app/src/sync.ts`, `recompute.ts`, `account.ts` | Backup, sync between phones, and logins |
+| `supabase/migrations` | The server tables and access rules (all named `ck_`) |
+| `supabase/functions/ck-auth` | The server function that creates logins |
 | `app/src/i18n.tsx` | Every word shown in the app, in English and Swahili |
 | `app/src/theme.css` | Colours and sizes |

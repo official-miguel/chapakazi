@@ -185,18 +185,21 @@ export interface Customer {
   updatedAt: number
 }
 
+/** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
+export type Synced<T> = T & { dirty?: number }
+
 export const db = new Dexie('chapa-kazi') as Dexie & {
-  customers: EntityTable<Customer, 'id'>
-  people: EntityTable<Person, 'id'>
-  businesses: EntityTable<Business, 'id'>
-  memberships: EntityTable<Membership, 'id'>
-  entries: EntityTable<Entry, 'id'>
-  entryVersions: EntityTable<EntryVersion, 'id'>
-  alerts: EntityTable<Alert, 'id'>
-  items: EntityTable<Item, 'id'>
-  itemCosts: EntityTable<ItemCost, 'id'>
-  lineCosts: EntityTable<LineCost, 'id'>
-  stockMoves: EntityTable<StockMove, 'id'>
+  customers: EntityTable<Synced<Customer>, 'id'>
+  people: EntityTable<Synced<Person>, 'id'>
+  businesses: EntityTable<Synced<Business>, 'id'>
+  memberships: EntityTable<Synced<Membership>, 'id'>
+  entries: EntityTable<Synced<Entry>, 'id'>
+  entryVersions: EntityTable<Synced<EntryVersion>, 'id'>
+  alerts: EntityTable<Synced<Alert>, 'id'>
+  items: EntityTable<Synced<Item>, 'id'>
+  itemCosts: EntityTable<Synced<ItemCost>, 'id'>
+  lineCosts: EntityTable<Synced<LineCost>, 'id'>
+  stockMoves: EntityTable<Synced<StockMove>, 'id'>
 }
 
 db.version(1).stores({
@@ -238,4 +241,60 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export function newInviteCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6))
   return Array.from(bytes, (x) => CODE_ALPHABET[x % CODE_ALPHABET.length]).join('')
+}
+
+// Version 5 adds the "not yet backed up" flag to every table, and marks everything already
+// on the phone as needing backup.
+db.version(5)
+  .stores({
+    people: 'id, dirty',
+    businesses: 'id, ownerId, dirty',
+    memberships: 'id, personId, businessId, dirty',
+    entries: 'id, businessId, occurredAt, customerId, dirty',
+    entryVersions: 'id, entryId, dirty',
+    alerts: 'id, businessId, entryId, dirty',
+    items: 'id, businessId, dirty',
+    itemCosts: 'id, businessId, dirty',
+    lineCosts: 'id, entryId, dirty',
+    stockMoves: 'id, itemId, businessId, entryId, dirty',
+    customers: 'id, businessId, dirty',
+  })
+  .upgrade(async (tx) => {
+    for (const table of tx.storeNames) {
+      await tx.table(table).toCollection().modify({ dirty: 1 })
+    }
+  })
+
+/** A database transaction that is applying records from the server, not a change made on this phone. */
+type MaybeRemote = { fromServer?: boolean }
+
+const changeListeners = new Set<() => void>()
+
+/** Lets the sync engine hear about every change made on this phone. */
+export function onLocalChange(listener: () => void): () => void {
+  changeListeners.add(listener)
+  return () => changeListeners.delete(listener)
+}
+
+// Every record saved or changed on this phone is flagged for backup automatically, so no screen
+// has to remember to do it. Records arriving from the server are not flagged (see runAsServer).
+for (const table of db.tables) {
+  table.hook('creating', (_key, record: { dirty?: number }, tx) => {
+    if ((tx as MaybeRemote).fromServer) return
+    record.dirty = 1
+    changeListeners.forEach((notify) => notify())
+  })
+  table.hook('updating', (_changes, _key, _record, tx) => {
+    if ((tx as MaybeRemote).fromServer) return undefined
+    changeListeners.forEach((notify) => notify())
+    return { dirty: 1 }
+  })
+}
+
+/** Runs database work that comes from the server, so it is not flagged for backup again. */
+export function runAsServer<T>(work: () => Promise<T>): Promise<T> {
+  return db.transaction('rw', db.tables, (tx) => {
+    ;(tx as MaybeRemote).fromServer = true
+    return work()
+  })
 }

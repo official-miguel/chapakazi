@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PinPad } from '../components/PinPad'
 import type { Person } from '../db'
-import { inviteCodeMatches, setFirstPin } from '../directory'
+import { inviteCodeMatches, setFirstPin, setOwnPin } from '../directory'
 import { useI18n } from '../i18n'
 import { verifyPin } from '../pin'
 import { useSession, viewsFor } from '../session'
+import { useSyncState } from '../sync'
 
 const MAX_TRIES = 5
 const WAIT_MS = 30_000
@@ -37,6 +38,7 @@ function saveTries(personId: string, tries: Tries | null) {
 export function LockScreen() {
   const { t } = useI18n()
   const { dir } = useSession()
+  const { devicePersonId } = useSyncState()
   const [chosen, setChosen] = useState<Person | null>(null)
 
   const people = dir.people
@@ -74,7 +76,9 @@ export function LockScreen() {
                   <span className="list-sub">
                     {person.pinHash
                       ? `${isOwner ? t('role.owner') : t('role.worker')}${!isOwner && shop ? ` · ${shop}` : ''}`
-                      : t('lock.newWorker')}
+                      : person.id === devicePersonId
+                        ? t('lock.choosePin')
+                        : t('lock.newWorker')}
                   </span>
                 </span>
                 <ChevronRight size={22} aria-hidden />
@@ -91,10 +95,12 @@ function SignIn({ person, onBack }: { person: Person; onBack: () => void }) {
   const { t } = useI18n()
   const { login } = useSession()
   const needsFirstPin = !person.pinHash
+  // The owner signing in on a new phone, or a worker who joined on their own phone.
+  const ownsThisPhone = useSyncState().devicePersonId === person.id
 
   // New worker: invite code, then choose a PIN twice.
   const [code, setCode] = useState('')
-  const [codeOk, setCodeOk] = useState(false)
+  const [codeOk, setCodeOk] = useState(ownsThisPhone)
   const [codeError, setCodeError] = useState(false)
   const [firstPin, setFirstPinValue] = useState('')
   const [mismatch, setMismatch] = useState(false)
@@ -205,7 +211,12 @@ function SignIn({ person, onBack }: { person: Person; onBack: () => void }) {
               setMismatch(true)
               return false
             }
-            if (await setFirstPin(person.id, code, pin)) login(person.id)
+            if (ownsThisPhone) {
+              await setOwnPin(person.id, pin)
+              login(person.id)
+            } else if (await setFirstPin(person.id, code, pin)) {
+              login(person.id)
+            }
             return true
           }}
         />

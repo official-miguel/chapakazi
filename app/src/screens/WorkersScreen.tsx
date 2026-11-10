@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { EmptyState } from '../components/EmptyState'
 import { Sheet } from '../components/Sheet'
 import type { Membership, Person } from '../db'
-import { addWorker, removeWorker } from '../directory'
+import { addWorker, removeWorker, renewInvite } from '../directory'
 import { useI18n } from '../i18n'
 import { useSession } from '../session'
 
@@ -71,13 +71,18 @@ export function WorkersScreen() {
                   <span className="list-title">{w.person.name}</span>
                   <span className="list-sub">
                     {w.shopName}
-                    {w.person.pinHash ? ` · ${t('workers.active')}` : ''}
+                    {w.membership.inviteCode ? '' : ` · ${t('workers.active')}`}
                   </span>
                 </span>
                 <button type="button" className="link-danger" onClick={() => setRemoving(w)}>
                   {t('workers.remove')}
                 </button>
               </div>
+              {!w.membership.inviteCode && (
+                <button type="button" className="link-btn" onClick={() => void renewInvite(w.membership.id)}>
+                  {t('workers.newCode')}
+                </button>
+              )}
               {w.membership.inviteCode && (
                 <div className="invite">
                   <span className="invite-label">{t('workers.code')}</span>
