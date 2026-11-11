@@ -65,11 +65,22 @@ const toDraft = (line: EntryLine): LineDraft => ({
   total: line.totalCents ? centsText(line.totalCents) : '',
 })
 
+export type EntryDraft = {
+  shopId?: string
+  amountCents?: number | null
+  method?: PayMethod
+  category?: ExpenseCategory
+  note?: string
+  lines?: EntryLine[]
+  customer?: Customer
+}
+
 /** The form for a new sale, expense, credit or debt payment, and for editing an existing entry. */
 export function EntryForm({
   kind,
   editing,
   forCustomer,
+  draft,
   onClose,
 }: {
   kind: EntryKind
@@ -77,6 +88,8 @@ export function EntryForm({
   editing?: Entry
   /** When opened from a customer's page, the credit or payment is for them. */
   forCustomer?: Customer
+  /** Values to start a new entry with, for example what was understood from voice. */
+  draft?: EntryDraft
   onClose: () => void
 }) {
   const { t } = useI18n()
@@ -84,19 +97,22 @@ export function EntryForm({
   const { person, shops, ownsShop } = useSession()
   const takesItems = kind === 'sale' || kind === 'credit'
   const needsCustomer = kind === 'credit' || kind === 'payment'
-  const [amount, setAmount] = useState(editing ? centsText(editing.amountCents) : '')
-  const [method, setMethod] = useState<PayMethod>(editing && editing.method !== 'credit' ? editing.method : 'cash')
-  const [category, setCategory] = useState<ExpenseCategory>(editing?.category ?? 'stock')
-  const [note, setNote] = useState(editing?.note ?? '')
-  const [shopId, setShopId] = useState(editing?.businessId ?? forCustomer?.businessId ?? shops[0]?.id ?? '')
-  const [picked, setPicked] = useState<Customer | null>(forCustomer ?? null)
+  const [amount, setAmount] = useState(editing ? centsText(editing.amountCents) : draft?.amountCents ? centsText(draft.amountCents) : '')
+  const [method, setMethod] = useState<PayMethod>(() => {
+    const start = editing?.method ?? draft?.method
+    return start && start !== 'credit' ? start : 'cash'
+  })
+  const [category, setCategory] = useState<ExpenseCategory>(editing?.category ?? draft?.category ?? 'stock')
+  const [note, setNote] = useState(editing?.note ?? draft?.note ?? '')
+  const [shopId, setShopId] = useState(editing?.businessId ?? forCustomer?.businessId ?? draft?.shopId ?? shops[0]?.id ?? '')
+  const [picked, setPicked] = useState<Customer | null>(forCustomer ?? draft?.customer ?? null)
   // When editing, the customer is fixed; they are looked up only to show their name.
   const editedCustomer = useLiveQuery(
     async () => (editing?.customerId ? ((await db.customers.get(editing.customerId)) ?? null) : null),
     [editing?.customerId],
   )
   const customer = editing ? (editedCustomer ?? null) : picked
-  const [lines, setLines] = useState<LineDraft[]>(() => (editing?.lines ?? []).map(toDraft))
+  const [lines, setLines] = useState<LineDraft[]>(() => (editing?.lines ?? draft?.lines ?? []).map(toDraft))
   const [picking, setPicking] = useState(false)
   const [search, setSearch] = useState('')
   const [error, setError] = useState<WordKey | null>(null)

@@ -6,10 +6,10 @@ import type { WordKey } from '../i18n'
 import { useSession } from '../session'
 import type { View } from '../session'
 import { useSyncState } from '../sync'
-import { useToast } from '../toast'
 import { useOnline } from '../useOnline'
 import { usePendingCount } from './BackupCard'
 import { Sheet } from './Sheet'
+import { VoiceSheet } from './VoiceSheet'
 
 const tabs: { to: string; label: WordKey; icon: typeof Home }[] = [
   { to: '/', label: 'nav.home', icon: Home },
@@ -21,10 +21,10 @@ const tabs: { to: string; label: WordKey; icon: typeof Home }[] = [
 
 export function Layout() {
   const { t } = useI18n()
-  const toast = useToast()
   const online = useOnline()
   const { dir, person, view, business, views, lock, switchTo } = useSession()
   const [switching, setSwitching] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   const sync = useSyncState()
   const pending = usePendingCount()
 
@@ -71,7 +71,7 @@ export function Layout() {
         type="button"
         className="mic"
         aria-label={t('mic.label')}
-        onClick={() => toast(t('toast.voiceLater'))}
+        onClick={() => setSpeaking(true)}
       >
         <Mic size={30} aria-hidden />
       </button>
@@ -84,6 +84,8 @@ export function Layout() {
           </NavLink>
         ))}
       </nav>
+
+      {speaking && <VoiceSheet onClose={() => setSpeaking(false)} />}
 
       {switching && (
         <Sheet title={t('switch.title')} onClose={() => setSwitching(false)}>

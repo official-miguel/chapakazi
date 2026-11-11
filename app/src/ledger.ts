@@ -67,6 +67,7 @@ export async function recordEntry(
   data: Omit<EntryData, 'cancelled'>,
   actor: Actor,
   customerId?: string,
+  source: Entry['source'] = 'typed',
 ): Promise<string> {
   const now = Date.now()
   const id = newId()
@@ -86,7 +87,7 @@ export async function recordEntry(
       occurredAt: now,
       updatedAt: now,
       versions: 1,
-      source: 'typed',
+      source,
     })
     await db.entryVersions.add({
       ...fields,

@@ -1253,6 +1253,104 @@ a.btn {
   margin: 4px 0 0 58px;
 }
 
+/* Voice */
+.voice-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.voice-mic {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #000;
+  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
+}
+
+.voice-mic:disabled {
+  opacity: 0.4;
+}
+
+.voice-mic-on {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.5);
+  animation: voice-pulse 1.4s infinite;
+}
+
+@keyframes voice-pulse {
+  70% {
+    box-shadow: 0 0 0 22px rgba(217, 48, 37, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 48, 37, 0);
+  }
+}
+
+.voice-status {
+  min-height: 1.4em;
+  margin: 16px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.voice-problem {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.voice-type {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.voice-type .field {
+  margin-bottom: 0;
+}
+
+.voice-heard {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.voice-card {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  list-style: none;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.voice-card li:first-child {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.voice-ask {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-mic-on {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
