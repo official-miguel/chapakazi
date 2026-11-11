@@ -28,6 +28,10 @@ export function HealthReportScreen() {
 
   if (!person || !shop) return null
 
+  // Under 30 days of records the figures are plain totals, not monthly averages.
+  const salesLabel: WordKey = report?.scaled === false ? 'health.totalSales' : 'health.avgSales'
+  const expensesLabel: WordKey = report?.scaled === false ? 'health.totalExpenses' : 'health.avgExpenses'
+
   const locale = lang === 'sw' ? 'sw-KE' : 'en-KE'
   const date = (ms: number) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(ms)
   const monthName = (ms: number) => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(ms)
@@ -37,8 +41,8 @@ export function HealthReportScreen() {
     const text = [
       `${shop.name}: ${t('health.title')}`,
       t('health.period', { from: date(report.from), to: date(report.to), days: report.daysOfRecords }),
-      `${t('health.avgSales')}: ${formatKsh(report.avgMonthlySalesCents)}`,
-      `${t('health.avgExpenses')}: ${formatKsh(report.avgMonthlyExpensesCents)}`,
+      `${t(salesLabel)}: ${formatKsh(report.avgMonthlySalesCents)}`,
+      `${t(expensesLabel)}: ${formatKsh(report.avgMonthlyExpensesCents)}`,
       `${t('health.steadiness')}: ${t(steadyWords[report.steadiness])}`,
       t('health.disclaimer'),
     ].join('\n')
@@ -84,11 +88,11 @@ export function HealthReportScreen() {
 
               <section className="report-figures">
                 <div>
-                  <span>{t('health.avgSales')}</span>
+                  <span>{t(salesLabel)}</span>
                   <b>{formatKsh(report.avgMonthlySalesCents)}</b>
                 </div>
                 <div>
-                  <span>{t('health.avgExpenses')}</span>
+                  <span>{t(expensesLabel)}</span>
                   <b>{formatKsh(report.avgMonthlyExpensesCents)}</b>
                 </div>
                 <div>

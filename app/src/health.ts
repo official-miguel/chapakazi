@@ -33,6 +33,8 @@ export type HealthReport = {
   /** Days in that span on which at least one sale was recorded. */
   daysTraded: number
   months: MonthRow[]
+  /** True when the "monthly" figures are averages. False (under 30 days of records): they are the plain totals recorded. */
+  scaled: boolean
   avgMonthlySalesCents: number
   avgMonthlyExpensesCents: number
   totalSalesCents: number
@@ -135,7 +137,10 @@ export async function healthReport(businessId: string, now: number): Promise<Hea
 
   const customers = await db.customers.where('businessId').equals(businessId).toArray()
   const supplierDebts = owedBySupplier(await db.supplierMoves.where('businessId').equals(businessId).toArray())
-  const perMonth = MONTH_DAYS / daysOfRecords
+  // With less than a month of records, scaling up would invent sales that were never recorded
+  // (three days of sales would be multiplied tenfold). Then the figures are simply what was recorded.
+  const scaled = daysOfRecords >= MONTH_DAYS
+  const perMonth = scaled ? MONTH_DAYS / daysOfRecords : 1
 
   return {
     from,
@@ -144,8 +149,9 @@ export async function healthReport(businessId: string, now: number): Promise<Hea
     daysTraded: tradedDays.size,
     months,
     // Averages are estimates, so they are given to the nearest shilling.
-    avgMonthlySalesCents: Math.round((sales * perMonth) / 100) * 100,
-    avgMonthlyExpensesCents: Math.round((expenses * perMonth) / 100) * 100,
+    scaled,
+    avgMonthlySalesCents: scaled ? Math.round((sales * perMonth) / 100) * 100 : sales,
+    avgMonthlyExpensesCents: scaled ? Math.round((expenses * perMonth) / 100) * 100 : expenses,
     totalSalesCents: sales,
     creditShare: sales > 0 ? credit / sales : 0,
     mpesaShare: moneyIn > 0 ? mpesaIn / moneyIn : 0,
