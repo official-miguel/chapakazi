@@ -12,7 +12,9 @@ import { LedgerScreen } from './screens/LedgerScreen'
 import { CustomerScreen } from './screens/CustomerScreen'
 import { DebtsScreen } from './screens/DebtsScreen'
 import { StockScreen } from './screens/StockScreen'
+import { PlatformScreen } from './screens/PlatformScreen'
 import { WorkersScreen } from './screens/WorkersScreen'
+import { usePlatformAdmin } from './platform'
 import { SessionProvider, useSession } from './session'
 import { startSync } from './sync'
 import { ToastProvider } from './toast'
@@ -20,6 +22,7 @@ import { ToastProvider } from './toast'
 /** Decides what the person sees: first-time setup, the lock screen, or the app itself. */
 function Gate() {
   const { dir, person, isAdmin } = useSession()
+  const platformAdmin = usePlatformAdmin()
 
   if (dir.people.length === 0) return <Onboarding />
   if (!person) return <LockScreen />
@@ -37,6 +40,8 @@ function Gate() {
         {isAdmin && <Route path="businesses" element={<BusinessesScreen />} />}
         {isAdmin && <Route path="workers" element={<WorkersScreen />} />}
         {isAdmin && <Route path="alerts" element={<AlertsScreen />} />}
+        {/* The page for whoever runs Chapa Kazi. The server refuses everyone else regardless. */}
+        {platformAdmin && <Route path="platform" element={<PlatformScreen />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

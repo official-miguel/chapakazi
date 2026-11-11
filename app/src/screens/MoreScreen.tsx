@@ -1,8 +1,9 @@
-import { ChevronRight, Lock, Store, UserPlus } from 'lucide-react'
+import { ChevronRight, Lock, ShieldCheck, Store, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BackupCard } from '../components/BackupCard'
 import { useI18n } from '../i18n'
 import type { Lang } from '../i18n'
+import { usePlatformAdmin } from '../platform'
 import { useSession } from '../session'
 import { useOnline } from '../useOnline'
 
@@ -15,6 +16,7 @@ export function MoreScreen() {
   const { t, lang, setLang } = useI18n()
   const { isAdmin, lock } = useSession()
   const online = useOnline()
+  const platformAdmin = usePlatformAdmin()
 
   return (
     <>
@@ -33,6 +35,18 @@ export function MoreScreen() {
             <UserPlus size={24} aria-hidden />
             <span className="list-main">
               <span className="list-title">{t('more.workers')}</span>
+            </span>
+            <ChevronRight size={22} aria-hidden />
+          </Link>
+        </div>
+      )}
+
+      {platformAdmin && (
+        <div className="list list-gap">
+          <Link to="/platform" className="list-row">
+            <ShieldCheck size={24} aria-hidden />
+            <span className="list-main">
+              <span className="list-title">{t('platform.title')}</span>
             </span>
             <ChevronRight size={22} aria-hidden />
           </Link>

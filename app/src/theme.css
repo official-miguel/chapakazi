@@ -1253,6 +1253,38 @@ a.btn {
   margin: 4px 0 0 58px;
 }
 
+/* Platform admin */
+.segmented-3 {
+  grid-template-columns: repeat(3, 1fr);
+  margin: 12px 0;
+}
+
+.platform-note {
+  margin: 10px 2px 0;
+}
+
+.platform-filter {
+  margin-bottom: 12px;
+}
+
+.platform-key {
+  margin-top: 14px;
+}
+
+.dot-off {
+  background: var(--line);
+}
+
+.totals:has(> :nth-child(3)) {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 420px) {
+  .totals:has(> :nth-child(3)) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* Voice */
 .voice-stage {
   display: flex;
