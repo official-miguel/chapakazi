@@ -5,8 +5,18 @@ import { bizTypeLabel } from '../bizTypes'
 import type { BusinessType } from '../db'
 import { useI18n } from '../i18n'
 import { parseAmount } from '../ledger'
-import { isActive, loadCallbackAddresses, loadMpesaRequests, loadOverview, saveGeminiKey, sendTestPayment, setMpesaStatus } from '../platform'
-import type { MpesaRequest, Overview } from '../platform'
+import {
+  isActive,
+  loadCallbackAddresses,
+  loadDarajaStatus,
+  loadMpesaRequests,
+  loadOverview,
+  saveDarajaKeys,
+  saveGeminiKey,
+  sendTestPayment,
+  setMpesaStatus,
+} from '../platform'
+import type { DarajaEnv, DarajaStatus, MpesaRequest, Overview } from '../platform'
 import { useTimeFormat } from '../useTimeFormat'
 
 type Tab = 'shops' | 'people' | 'mpesa' | 'settings'
@@ -27,6 +37,11 @@ export function PlatformScreen() {
   const [testAmounts, setTestAmounts] = useState<Record<string, string>>({})
   const [testSent, setTestSent] = useState<string | null>(null)
   const [addresses, setAddresses] = useState<{ confirm: string; validate: string } | null>(null)
+  const [daraja, setDaraja] = useState<DarajaStatus>({ set: false })
+  const [darajaEnv, setDarajaEnv] = useState<DarajaEnv>('sandbox')
+  const [darajaKey, setDarajaKey] = useState('')
+  const [darajaSecret, setDarajaSecret] = useState('')
+  const [darajaState, setDarajaState] = useState<'idle' | 'saving' | 'saved' | 'bad'>('idle')
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -34,6 +49,7 @@ export function PlatformScreen() {
     try {
       setData(await loadOverview())
       setRequests(await loadMpesaRequests())
+      setDaraja(await loadDarajaStatus())
     } catch {
       setFailed(true)
     } finally {
@@ -43,6 +59,21 @@ export function PlatformScreen() {
   useEffect(() => void refresh(), [refresh])
 
   const when = (at: string | null) => (at ? dateTime(Date.parse(at)) : t('platform.never'))
+
+  const saveDaraja = async (e: FormEvent) => {
+    e.preventDefault()
+    if (darajaState === 'saving') return
+    setDarajaState('saving')
+    try {
+      await saveDarajaKeys(darajaEnv, darajaKey, darajaSecret)
+      setDarajaKey('')
+      setDarajaSecret('')
+      setDarajaState('saved')
+      setDaraja(await loadDarajaStatus())
+    } catch {
+      setDarajaState('bad')
+    }
+  }
 
   const saveKey = async (e: FormEvent) => {
     e.preventDefault()
@@ -253,6 +284,54 @@ export function PlatformScreen() {
                 </div>
               ))}
             </div>
+          )}
+
+          {tab === 'settings' && (
+            <section className="card">
+              <h2 className="card-title">{t('platform.daraja')}</h2>
+              <p className="row">
+                <KeyRound size={20} aria-hidden />
+                <span>
+                  {daraja.set
+                    ? t('platform.darajaSet', {
+                        env: t(daraja.env === 'production' ? 'platform.darajaLive' : 'platform.darajaTest'),
+                        hint: daraja.hint ?? '',
+                        when: when(daraja.updated_at ?? null),
+                      })
+                    : t('platform.darajaNone')}
+                </span>
+              </p>
+              <p className="card-note">{t('platform.darajaNote')}</p>
+              <form onSubmit={saveDaraja} onChange={() => setDarajaState('idle')}>
+                <div className="field platform-key">
+                  <span>{t('platform.darajaEnv')}</span>
+                  <div className="segmented">
+                    {(['sandbox', 'production'] as const).map((env) => (
+                      <button key={env} type="button" className={env === darajaEnv ? 'segment segment-on' : 'segment'} aria-pressed={env === darajaEnv} onClick={() => setDarajaEnv(env)}>
+                        {t(env === 'production' ? 'platform.darajaLive' : 'platform.darajaTest')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="field">
+                  <span>Consumer Key</span>
+                  <input type="password" value={darajaKey} onChange={(e) => setDarajaKey(e.target.value)} autoComplete="off" spellCheck={false} />
+                </label>
+                <label className="field">
+                  <span>Consumer Secret</span>
+                  <input type="password" value={darajaSecret} onChange={(e) => setDarajaSecret(e.target.value)} autoComplete="off" spellCheck={false} />
+                </label>
+                {darajaState === 'bad' && (
+                  <p className="field-error" role="alert">
+                    {t('platform.keyBad')}
+                  </p>
+                )}
+                {darajaState === 'saved' && <p className="card-note">{t('entry.saved')}</p>}
+                <button type="submit" className="btn btn-primary" disabled={darajaState === 'saving' || darajaKey.trim().length < 16 || darajaSecret.trim().length < 16}>
+                  {t('common.save')}
+                </button>
+              </form>
+            </section>
           )}
 
           {tab === 'settings' && (

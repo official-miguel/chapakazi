@@ -114,6 +114,24 @@ export async function loadCallbackAddresses(): Promise<{ confirm: string; valida
   return { confirm: `${base}/confirm/${data}`, validate: `${base}/validate/${data}` }
 }
 
+export type DarajaEnv = 'sandbox' | 'production'
+export type DarajaStatus = { set: boolean; env?: DarajaEnv; hint?: string; updated_at?: string }
+
+/** Whether Daraja keys are saved, for which environment, and the key's last four characters. */
+export async function loadDarajaStatus(): Promise<DarajaStatus> {
+  if (!supabase) throw new Error('No server')
+  const { data, error } = await supabase.rpc('ck_admin_daraja_status')
+  if (error) throw error
+  return data as DarajaStatus
+}
+
+/** Saves the Daraja keys on the server. They are stored encrypted and can never be read back here. */
+export async function saveDarajaKeys(env: DarajaEnv, key: string, secret: string): Promise<void> {
+  if (!supabase) throw new Error('No server')
+  const { error } = await supabase.rpc('ck_admin_set_daraja_keys', { p_env: env, p_key: key, p_secret: secret })
+  if (error) throw error
+}
+
 /** True if the signed-in login is a platform admin. Asked from the server once per sign-in. */
 export function usePlatformAdmin(): boolean {
   const { signedIn, email } = useSyncState()
