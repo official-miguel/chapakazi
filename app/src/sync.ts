@@ -56,6 +56,7 @@ const specs: Spec[] = [
   { local: table(db.entries), remote: 'ck_entries', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.entryVersions), remote: 'ck_entry_versions', appendOnly: true, time: (r) => num(r.changedAt), columns: shop },
   { local: table(db.stockMoves), remote: 'ck_stock_moves', appendOnly: true, time: (r) => num(r.at), columns: shop },
+  { local: table(db.cashCounts), remote: 'ck_cash_counts', appendOnly: true, time: (r) => num(r.at), columns: shop },
   { local: table(db.lineCosts), remote: 'ck_line_costs', appendOnly: true, time: () => 0, columns: shop },
   { local: table(db.alerts), remote: 'ck_alerts', appendOnly: true, time: (r) => num(r.seenAt) || num(r.at), columns: shop },
 ]

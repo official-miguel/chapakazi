@@ -1,4 +1,4 @@
-import { ChartColumn, ChevronRight, Lock, ShieldCheck, Store, UserPlus } from 'lucide-react'
+import { Banknote, ChartColumn, ChevronRight, Lock, ShieldCheck, Store, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BackupCard } from '../components/BackupCard'
 import { useI18n } from '../i18n'
@@ -21,6 +21,16 @@ export function MoreScreen() {
   return (
     <>
       <h1 className="screen-title">{t('nav.more')}</h1>
+
+      <div className="list list-gap">
+        <Link to="/cash-count" className="list-row">
+          <Banknote size={24} aria-hidden />
+          <span className="list-main">
+            <span className="list-title">{t('cash.title')}</span>
+          </span>
+          <ChevronRight size={22} aria-hidden />
+        </Link>
+      </div>
 
       {isAdmin && (
         <div className="list list-gap">

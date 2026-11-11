@@ -1404,6 +1404,33 @@ a.btn {
   overflow-wrap: anywhere;
 }
 
+/* Cash count */
+.cash-sum th {
+  text-align: left;
+}
+
+.cash-sum tr:first-child th,
+.cash-sum tr:first-child td {
+  border-top: 0;
+}
+
+.cash-strong th,
+.cash-strong td {
+  font-weight: 600;
+}
+
+.cash-gap {
+  margin: 14px 0;
+  font-size: 23px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.list-row > .row-amount {
+  flex: none;
+  font-size: 14px;
+}
+
 /* Platform admin */
 .segmented-3 {
   grid-template-columns: repeat(3, 1fr);

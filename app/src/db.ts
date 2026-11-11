@@ -197,6 +197,24 @@ export interface VoiceAlias {
   updatedAt: number
 }
 
+/** One count of the till, compared with what the ledger said should be there. Never changed afterwards. */
+export interface CashCount {
+  id: string
+  businessId: string
+  /** Start of the day that was counted. */
+  day: number
+  /** Cash in the till at the start of the day. */
+  openingCents: number
+  /** What the ledger says should be there: opening + cash in - cash out. */
+  expectedCents: number
+  countedCents: number
+  /** Counted minus expected. Negative means cash is short. */
+  gapCents: number
+  note?: string
+  byPersonId: string
+  at: number
+}
+
 /** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
 export type Synced<T> = T & { dirty?: number }
 
@@ -213,6 +231,7 @@ export const db = new Dexie('chapa-kazi') as Dexie & {
   lineCosts: EntityTable<Synced<LineCost>, 'id'>
   stockMoves: EntityTable<Synced<StockMove>, 'id'>
   voiceAliases: EntityTable<Synced<VoiceAlias>, 'id'>
+  cashCounts: EntityTable<Synced<CashCount>, 'id'>
 }
 
 db.version(1).stores({
@@ -280,6 +299,10 @@ db.version(5)
 
 db.version(6).stores({
   voiceAliases: 'id, businessId, dirty',
+})
+
+db.version(7).stores({
+  cashCounts: 'id, businessId, dirty',
 })
 
 /** A database transaction that is applying records from the server, not a change made on this phone. */

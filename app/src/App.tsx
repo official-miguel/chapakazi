@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { I18nProvider } from './i18n'
 import { BusinessesScreen } from './screens/BusinessesScreen'
+import { CashCountScreen } from './screens/CashCountScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockScreen } from './screens/LockScreen'
 import { MoreScreen } from './screens/MoreScreen'
@@ -37,6 +38,7 @@ function Gate() {
         <Route path="debts" element={<DebtsScreen />} />
         <Route path="debts/:customerId" element={<CustomerScreen />} />
         <Route path="more" element={<MoreScreen />} />
+        <Route path="cash-count" element={<CashCountScreen />} />
         {/* Owner-only pages do not exist at all in the worker view. */}
         {isAdmin && <Route path="businesses" element={<BusinessesScreen />} />}
         {isAdmin && <Route path="workers" element={<WorkersScreen />} />}
