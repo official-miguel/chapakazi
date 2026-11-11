@@ -1609,6 +1609,54 @@ a.btn {
   font-size: 14px;
 }
 
+/* M-Pesa inbox */
+.inbox-amount {
+  font-size: 23px;
+}
+
+.inbox-suggest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 15px;
+}
+
+.inbox-suggest span {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-suggest .btn {
+  width: auto;
+  margin: 0;
+  padding: 0 18px;
+}
+
+.inbox-ignore {
+  display: block;
+  margin: 6px auto 0;
+  color: var(--text-dim);
+}
+
+.tag-green {
+  background: #dcf5e4;
+  color: var(--green-ink);
+}
+
+.ink-green {
+  color: var(--green-ink);
+}
+
+.btn-trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
 /* M-Pesa requests */
 .dot-bad {
   background: var(--red);

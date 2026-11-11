@@ -20,6 +20,8 @@ type Spec = {
   remote: string
   /** History tables are only added to, never changed. */
   appendOnly: boolean
+  /** Records the server creates and phones may only change (M-Pesa payments). */
+  updateOnly?: boolean
   /** The phone time this record was last changed. */
   time: (row: Row) => number
   /** Extra server columns the access rules need. */
@@ -55,6 +57,7 @@ const specs: Spec[] = [
   { local: table(db.voiceAliases), remote: 'ck_voice_aliases', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.suppliers), remote: 'ck_suppliers', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.mpesaLinks), remote: 'ck_mpesa_links', appendOnly: false, time: updatedAt, columns: shop },
+  { local: table(db.mpesaPayments), remote: 'ck_mpesa_payments', appendOnly: false, updateOnly: true, time: updatedAt, columns: shop },
   { local: table(db.supplierMoves), remote: 'ck_supplier_moves', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.entries), remote: 'ck_entries', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.entryVersions), remote: 'ck_entry_versions', appendOnly: true, time: (r) => num(r.changedAt), columns: shop },
@@ -175,7 +178,27 @@ async function pushTable(spec: Spec, touched: Touched): Promise<void> {
     if (rows.length === 0) return
     const payload = rows.map((r) => toRemote(spec, r))
 
-    if (spec.remote === 'ck_alerts') {
+    if (spec.updateOnly) {
+      // Phones never add these records, so each change is sent as a plain "change this one".
+      const lost: string[] = []
+      for (const row of payload) {
+        const { data, error } = await supabase
+          .from(spec.remote)
+          .update({ data: row.data, updated_at: row.updated_at })
+          .eq('id', row.id)
+          .select('id, updated_at')
+        if (error) throw error
+        if (data?.[0] && num(data[0].updated_at) > row.updated_at) lost.push(row.id)
+      }
+      // Another phone sorted the same payment later: take its version.
+      if (lost.length) {
+        const { data: winners } = await supabase.from(spec.remote).select('*').in('id', lost)
+        await runAsServer(async () => {
+          for (const id of lost) await spec.local.where('id').equals(id).modify({ dirty: 0 })
+        })
+        await applyRemote(spec, (winners ?? []) as RemoteRow[], touched)
+      }
+    } else if (spec.remote === 'ck_alerts') {
       // Workers' phones raise alerts but may not read them, so each one is sent as a plain
       // "add". If it is already on the server (code 23505) that is fine.
       for (const alert of payload) {

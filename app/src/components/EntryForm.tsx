@@ -82,6 +82,7 @@ export function EntryForm({
   forCustomer,
   draft,
   onSaved,
+  source,
   onClose,
 }: {
   kind: EntryKind
@@ -92,7 +93,9 @@ export function EntryForm({
   /** Values to start a new entry with, for example what was understood from voice. */
   draft?: EntryDraft
   /** Told what was saved for a new entry, so voice can learn from a correction. */
-  onSaved?: (saved: { lines: EntryLine[]; customerId?: string; category?: ExpenseCategory }) => void
+  onSaved?: (saved: { entryId: string; lines: EntryLine[]; customerId?: string; category?: ExpenseCategory }) => void
+  /** Where a new entry came from. "mpesa" means it explains a payment that already arrived, so its amount is fixed. */
+  source?: Entry['source']
   onClose: () => void
 }) {
   const { t } = useI18n()
@@ -100,6 +103,7 @@ export function EntryForm({
   const { person, shops, ownsShop } = useSession()
   const takesItems = kind === 'sale' || kind === 'credit'
   const needsCustomer = kind === 'credit' || kind === 'payment'
+  const fromMpesa = source === 'mpesa'
   const [amount, setAmount] = useState(editing ? centsText(editing.amountCents) : draft?.amountCents ? centsText(draft.amountCents) : '')
   const [method, setMethod] = useState<PayMethod>(() => {
     const start = editing?.method ?? draft?.method
@@ -146,7 +150,7 @@ export function EntryForm({
     setLines(next)
     setError(null)
     const sum = next.reduce((acc, l) => acc + (parseAmount(l.total) ?? 0), 0)
-    if (sum > 0) setAmount(centsText(sum))
+    if (sum > 0 && !fromMpesa) setAmount(centsText(sum))
   }
 
   const addItem = (item: Item) => {
@@ -219,10 +223,10 @@ export function EntryForm({
       }
       const actor = { personId: person.id, isOwner: ownsShop(shopId) }
       if (editing) await editEntry(editing.id, data, actor)
-      else await recordEntry(shopId, data, actor, customer?.id)
+      const newId = editing ? null : await recordEntry(shopId, data, actor, customer?.id, source)
       toast(t('entry.saved'))
       // After the "Saved" message, so anything the caller wants to say is what stays on screen.
-      if (!editing) onSaved?.({ lines: finalLines, customerId: customer?.id, category: data.category })
+      if (newId) onSaved?.({ entryId: newId, lines: finalLines, customerId: customer?.id, category: data.category })
       onClose()
     } finally {
       setSaving(false)
@@ -235,7 +239,7 @@ export function EntryForm({
   return (
     <Sheet title={title} onClose={onClose}>
       <form onSubmit={save}>
-        {!editing && !forCustomer && shops.length > 1 && (
+        {!editing && !forCustomer && !fromMpesa && shops.length > 1 && (
           <div className="field">
             <span>{t('entry.shop')}</span>
             <div className="chips">
@@ -352,7 +356,8 @@ export function EntryForm({
             inputMode="decimal"
             autoComplete="off"
             placeholder="0"
-            autoFocus={!editing?.lines?.length && !(needsCustomer && !customer)}
+            readOnly={fromMpesa}
+            autoFocus={!fromMpesa && !editing?.lines?.length && !(needsCustomer && !customer)}
             aria-invalid={error === 'entry.amountBad'}
           />
         </label>
@@ -368,7 +373,7 @@ export function EntryForm({
         )}
 
         {/* Credit has no "paid by": no money has changed hands yet. */}
-        {kind !== 'credit' && (
+        {kind !== 'credit' && !fromMpesa && (
           <div className="field">
             <span>{t('entry.paidBy')}</span>
             <div className="segmented">

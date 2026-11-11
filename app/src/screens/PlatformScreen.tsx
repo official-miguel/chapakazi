@@ -4,7 +4,8 @@ import type { FormEvent } from 'react'
 import { bizTypeLabel } from '../bizTypes'
 import type { BusinessType } from '../db'
 import { useI18n } from '../i18n'
-import { isActive, loadMpesaRequests, loadOverview, saveGeminiKey, setMpesaStatus } from '../platform'
+import { parseAmount } from '../ledger'
+import { isActive, loadCallbackAddresses, loadMpesaRequests, loadOverview, saveGeminiKey, sendTestPayment, setMpesaStatus } from '../platform'
 import type { MpesaRequest, Overview } from '../platform'
 import { useTimeFormat } from '../useTimeFormat'
 
@@ -23,6 +24,9 @@ export function PlatformScreen() {
   const [keyState, setKeyState] = useState<'idle' | 'saving' | 'saved' | 'bad'>('idle')
   const [requests, setRequests] = useState<MpesaRequest[]>([])
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [testAmounts, setTestAmounts] = useState<Record<string, string>>({})
+  const [testSent, setTestSent] = useState<string | null>(null)
+  const [addresses, setAddresses] = useState<{ confirm: string; validate: string } | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -59,6 +63,14 @@ export function PlatformScreen() {
     await refresh()
   }
   const waiting = requests.filter((r) => r.status === 'requested').length
+
+  const sendTest = async (r: MpesaRequest) => {
+    const cents = parseAmount(testAmounts[r.business_id] ?? '')
+    if (cents === null) return
+    await sendTestPayment(r.business_id, cents)
+    setTestAmounts({ ...testAmounts, [r.business_id]: '' })
+    setTestSent(r.business_id)
+  }
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'shops', label: t('platform.shops') },
@@ -208,17 +220,55 @@ export function PlatformScreen() {
                       autoComplete="off"
                     />
                   </label>
-                  <div className="btn-pair">
+                  <div className="btn-trio">
                     <button type="button" className="btn btn-quiet btn-small" disabled={r.status === 'in_progress'} onClick={() => void moveRequest(r, 'in_progress')}>
                       {t('platform.mpesaStart')}
+                    </button>
+                    <button type="button" className="btn btn-quiet btn-small ink-green" disabled={r.status === 'active'} onClick={() => void moveRequest(r, 'active')}>
+                      {t('platform.mpesa_active')}
                     </button>
                     <button type="button" className="btn btn-quiet btn-small ink-red" disabled={r.status === 'rejected'} onClick={() => void moveRequest(r, 'rejected')}>
                       {t('platform.mpesaReject')}
                     </button>
                   </div>
+                  <div className="order-row">
+                    <span className="list-main">
+                      <span className="list-sub">{testSent === r.business_id ? t('platform.testSent') : t('platform.testHint')}</span>
+                    </span>
+                    <input
+                      className="order-qty"
+                      value={testAmounts[r.business_id] ?? ''}
+                      onChange={(e) => {
+                        setTestAmounts({ ...testAmounts, [r.business_id]: e.target.value })
+                        setTestSent(null)
+                      }}
+                      inputMode="decimal"
+                      placeholder="KSh"
+                      aria-label={t('platform.testSend')}
+                    />
+                    <button type="button" className="link-btn" onClick={() => void sendTest(r)}>
+                      {t('platform.testSend')}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+          )}
+
+          {tab === 'settings' && (
+            <section className="card">
+              <h2 className="card-title">{t('platform.callbackTitle')}</h2>
+              <p className="card-note">{t('platform.callbackNote')}</p>
+              {addresses ? (
+                <pre className="order-text platform-key">
+                  {`Confirmation:\n${addresses.confirm}\n\nValidation:\n${addresses.validate}`}
+                </pre>
+              ) : (
+                <button type="button" className="btn btn-quiet" onClick={() => void loadCallbackAddresses().then(setAddresses)}>
+                  {t('platform.callbackShow')}
+                </button>
+              )}
+            </section>
           )}
 
           {tab === 'settings' && (

@@ -98,6 +98,22 @@ export async function setMpesaStatus(businessId: string, status: MpesaRequest['s
   if (error) throw error
 }
 
+/** Sends a pretend payment into a shop's inbox, clearly marked as a test. */
+export async function sendTestPayment(businessId: string, amountCents: number): Promise<void> {
+  if (!supabase) throw new Error('No server')
+  const { error } = await supabase.rpc('ck_admin_send_test_payment', { p_business: businessId, p_amount_cents: amountCents, p_payer: '' })
+  if (error) throw error
+}
+
+/** The two addresses to give Safaricom. They contain a secret, so treat them like a password. */
+export async function loadCallbackAddresses(): Promise<{ confirm: string; validate: string }> {
+  if (!supabase) throw new Error('No server')
+  const { data, error } = await supabase.rpc('ck_admin_mpesa_callback_token')
+  if (error) throw error
+  const base = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ck-mpesa`
+  return { confirm: `${base}/confirm/${data}`, validate: `${base}/validate/${data}` }
+}
+
 /** True if the signed-in login is a platform admin. Asked from the server once per sign-in. */
 export function usePlatformAdmin(): boolean {
   const { signedIn, email } = useSyncState()

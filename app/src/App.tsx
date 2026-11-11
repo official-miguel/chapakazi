@@ -6,6 +6,7 @@ import { BusinessesScreen } from './screens/BusinessesScreen'
 import { CashCountScreen } from './screens/CashCountScreen'
 import { HealthReportScreen } from './screens/HealthReportScreen'
 import { HomeScreen } from './screens/HomeScreen'
+import { InboxScreen } from './screens/InboxScreen'
 import { LockScreen } from './screens/LockScreen'
 import { MoreScreen } from './screens/MoreScreen'
 import { MpesaScreen } from './screens/MpesaScreen'
@@ -42,6 +43,7 @@ function Gate() {
         <Route path="debts/:customerId" element={<CustomerScreen />} />
         <Route path="more" element={<MoreScreen />} />
         <Route path="cash-count" element={<CashCountScreen />} />
+        <Route path="inbox" element={<InboxScreen />} />
         {/* Owner-only pages do not exist at all in the worker view. */}
         {isAdmin && <Route path="businesses" element={<BusinessesScreen />} />}
         {isAdmin && <Route path="workers" element={<WorkersScreen />} />}

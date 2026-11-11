@@ -261,6 +261,30 @@ export interface MpesaLink {
   updatedAt: number
 }
 
+/** An M-Pesa payment that arrived for the shop. Only the server can add one. */
+export interface MpesaPayment {
+  id: string
+  businessId: string
+  /** The M-Pesa transaction code, e.g. "SKB7X1Y2Z3". */
+  transId: string
+  amountCents: number
+  payerName?: string
+  /** Safaricom's masked reference for the payer's phone. The same payer has the same reference. */
+  payerRef?: string
+  /** The account number typed on a Paybill payment. */
+  billRef?: string
+  shortcode?: string
+  paidAt: number
+  /** unassigned = still in the inbox; assigned = linked to a ledger entry; ignored = not the shop's business. */
+  status: 'unassigned' | 'assigned' | 'ignored'
+  entryId?: string | null
+  assignedBy?: string
+  assignedAt?: number
+  updatedAt: number
+  /** True for a pretend payment sent from Super admin to try the inbox. */
+  test?: boolean
+}
+
 /** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
 export type Synced<T> = T & { dirty?: number }
 
@@ -280,6 +304,7 @@ export const db = new Dexie('chapa-kazi') as Dexie & {
   cashCounts: EntityTable<Synced<CashCount>, 'id'>
   suppliers: EntityTable<Synced<Supplier>, 'id'>
   mpesaLinks: EntityTable<Synced<MpesaLink>, 'id'>
+  mpesaPayments: EntityTable<Synced<MpesaPayment>, 'id'>
   supplierMoves: EntityTable<Synced<SupplierMove>, 'id'>
 }
 
@@ -361,6 +386,10 @@ db.version(8).stores({
 
 db.version(9).stores({
   mpesaLinks: 'id, businessId, dirty',
+})
+
+db.version(10).stores({
+  mpesaPayments: 'id, businessId, dirty',
 })
 
 /** A database transaction that is applying records from the server, not a change made on this phone. */

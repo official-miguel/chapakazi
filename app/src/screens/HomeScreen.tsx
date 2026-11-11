@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Eye, HandCoins, PackageOpen, Receipt, ShoppingBag } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Eye, HandCoins, PackageOpen, Receipt, ShoppingBag, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EntryDetail } from '../components/EntryDetail'
@@ -33,6 +33,12 @@ export function HomeScreen() {
     async () => (isAdmin ? (await db.alerts.where('businessId').anyOf(shopIds).toArray()).filter((a) => !a.seenAt).length : 0),
     [shopIds.join(), isAdmin],
   )
+
+  // M-Pesa money that has arrived but nobody has yet said what it was for.
+  const unsorted = useLiveQuery(async () => {
+    const waiting = (await db.mpesaPayments.where('businessId').anyOf(shopIds).toArray()).filter((p) => p.status === 'unassigned')
+    return { count: waiting.length, cents: waiting.reduce((sum, p) => sum + p.amountCents, 0) }
+  }, [shopIds.join()])
 
   const lowStock = useLiveQuery(
     async () => (await db.items.where('businessId').anyOf(shopIds).toArray()).filter((i) => !i.archived && needsRestock(i)).length,
@@ -71,6 +77,16 @@ export function HomeScreen() {
             <span className="list-title">
               {t('alerts.title')} ({unseenAlerts})
             </span>
+          </span>
+          <ChevronRight size={22} aria-hidden />
+        </Link>
+      )}
+
+      {!!unsorted?.count && (
+        <Link to="/inbox" className="list-row alert-row">
+          <Smartphone size={22} aria-hidden />
+          <span className="list-main">
+            <span className="list-title">{t('inbox.homeCard', { n: unsorted.count, amount: formatKsh(unsorted.cents) })}</span>
           </span>
           <ChevronRight size={22} aria-hidden />
         </Link>
