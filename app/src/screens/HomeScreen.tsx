@@ -58,6 +58,12 @@ export function HomeScreen() {
         </div>
       </section>
 
+      {isAdmin && (
+        <Link to="/analysis" className="see-more">
+          {t('analysis.title')} <ChevronRight size={18} aria-hidden />
+        </Link>
+      )}
+
       {!!unseenAlerts && (
         <Link to="/alerts" className="list-row alert-row">
           <Eye size={22} aria-hidden />
