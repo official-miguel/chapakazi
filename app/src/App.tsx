@@ -8,6 +8,7 @@ import { HealthReportScreen } from './screens/HealthReportScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockScreen } from './screens/LockScreen'
 import { MoreScreen } from './screens/MoreScreen'
+import { MpesaScreen } from './screens/MpesaScreen'
 import { Onboarding } from './screens/Onboarding'
 import { AlertsScreen } from './screens/AlertsScreen'
 import { AnalysisScreen } from './screens/AnalysisScreen'
@@ -48,6 +49,7 @@ function Gate() {
         {isAdmin && <Route path="analysis" element={<AnalysisScreen />} />}
         {isAdmin && <Route path="suppliers" element={<SuppliersScreen />} />}
         {isAdmin && <Route path="health-report" element={<HealthReportScreen />} />}
+        {isAdmin && <Route path="mpesa" element={<MpesaScreen />} />}
         {/* The page for whoever runs Chapa Kazi. The server refuses everyone else regardless. */}
         {platformAdmin && <Route path="platform" element={<PlatformScreen />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

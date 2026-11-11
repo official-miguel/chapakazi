@@ -243,6 +243,24 @@ export interface SupplierMove {
   updatedAt: number
 }
 
+/** A shop's request to have its Till or Paybill connected. One per shop. */
+export interface MpesaLink {
+  id: string
+  businessId: string
+  kind: 'till' | 'paybill'
+  /** The Till or Paybill number. */
+  shortcode: string
+  /** The business name registered on that number. */
+  name: string
+  /** Decided by the super admin on the server; the phone only displays it. */
+  status: 'requested' | 'in_progress' | 'active' | 'rejected'
+  /** A message from the super admin, for example why a request was not approved. */
+  adminNote?: string | null
+  requestedBy: string
+  requestedAt: number
+  updatedAt: number
+}
+
 /** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
 export type Synced<T> = T & { dirty?: number }
 
@@ -261,6 +279,7 @@ export const db = new Dexie('chapa-kazi') as Dexie & {
   voiceAliases: EntityTable<Synced<VoiceAlias>, 'id'>
   cashCounts: EntityTable<Synced<CashCount>, 'id'>
   suppliers: EntityTable<Synced<Supplier>, 'id'>
+  mpesaLinks: EntityTable<Synced<MpesaLink>, 'id'>
   supplierMoves: EntityTable<Synced<SupplierMove>, 'id'>
 }
 
@@ -338,6 +357,10 @@ db.version(7).stores({
 db.version(8).stores({
   suppliers: 'id, businessId, dirty',
   supplierMoves: 'id, businessId, supplierId, dirty',
+})
+
+db.version(9).stores({
+  mpesaLinks: 'id, businessId, dirty',
 })
 
 /** A database transaction that is applying records from the server, not a change made on this phone. */

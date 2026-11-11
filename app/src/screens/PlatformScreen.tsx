@@ -4,11 +4,11 @@ import type { FormEvent } from 'react'
 import { bizTypeLabel } from '../bizTypes'
 import type { BusinessType } from '../db'
 import { useI18n } from '../i18n'
-import { isActive, loadOverview, saveGeminiKey } from '../platform'
-import type { Overview } from '../platform'
+import { isActive, loadMpesaRequests, loadOverview, saveGeminiKey, setMpesaStatus } from '../platform'
+import type { MpesaRequest, Overview } from '../platform'
 import { useTimeFormat } from '../useTimeFormat'
 
-type Tab = 'shops' | 'people' | 'settings'
+type Tab = 'shops' | 'people' | 'mpesa' | 'settings'
 
 /** Platform admin only: who is using Chapa Kazi and how active they are. Activity only, no money. */
 export function PlatformScreen() {
@@ -21,12 +21,15 @@ export function PlatformScreen() {
   const [activeOnly, setActiveOnly] = useState(true)
   const [key, setKey] = useState('')
   const [keyState, setKeyState] = useState<'idle' | 'saving' | 'saved' | 'bad'>('idle')
+  const [requests, setRequests] = useState<MpesaRequest[]>([])
+  const [notes, setNotes] = useState<Record<string, string>>({})
 
   const refresh = useCallback(async () => {
     setLoading(true)
     setFailed(false)
     try {
       setData(await loadOverview())
+      setRequests(await loadMpesaRequests())
     } catch {
       setFailed(true)
     } finally {
@@ -51,9 +54,16 @@ export function PlatformScreen() {
     }
   }
 
+  const moveRequest = async (r: MpesaRequest, status: MpesaRequest['status']) => {
+    await setMpesaStatus(r.business_id, status, notes[r.business_id] ?? r.admin_note ?? '')
+    await refresh()
+  }
+  const waiting = requests.filter((r) => r.status === 'requested').length
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'shops', label: t('platform.shops') },
     { id: 'people', label: t('platform.people') },
+    { id: 'mpesa', label: waiting > 0 ? `M-Pesa (${waiting})` : 'M-Pesa' },
     { id: 'settings', label: t('platform.settings') },
   ]
   const people = data?.people.filter((p) => !activeOnly || isActive(p.last_at)) ?? []
@@ -98,7 +108,7 @@ export function PlatformScreen() {
           </section>
           <p className="card-note platform-note">{t('platform.privacy')}</p>
 
-          <div className="segmented segmented-3" role="tablist">
+          <div className="segmented segmented-4" role="tablist">
             {tabs.map((x) => (
               <button
                 key={x.id}
@@ -113,7 +123,7 @@ export function PlatformScreen() {
             ))}
           </div>
 
-          {tab !== 'settings' && (
+          {(tab === 'shops' || tab === 'people') && (
             <div className="chips platform-filter">
               <button type="button" className={activeOnly ? 'chip chip-on' : 'chip'} aria-pressed={activeOnly} onClick={() => setActiveOnly(true)}>
                 {t('platform.activeOnly')}
@@ -167,6 +177,45 @@ export function PlatformScreen() {
                       !p.has_login && <span className="tag">{t('platform.sharedPhone')}</span>
                     )}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'mpesa' && (
+            <div className="list">
+              <p className="card-note platform-note">{t('platform.mpesaNote')}</p>
+              {requests.length === 0 && <p className="hint-note">{t('platform.mpesaNone')}</p>}
+              {requests.map((r) => (
+                <div key={r.business_id} className="worker-card">
+                  <div className="worker-head">
+                    <span className={r.status === 'requested' ? 'dot dot-warn' : r.status === 'rejected' ? 'dot dot-bad' : 'dot dot-on'} aria-hidden />
+                    <span className="list-main">
+                      <span className="list-title">{r.shop ?? '?'}</span>
+                      <span className="list-sub">
+                        {t(r.kind === 'till' ? 'mpesa.till' : 'mpesa.paybill')} {r.shortcode} · {r.name}
+                      </span>
+                      <span className="list-sub">{[r.owner_email, when(r.changed_at)].filter(Boolean).join(' · ')}</span>
+                    </span>
+                    <span className="tag">{t(`platform.mpesa_${r.status}`)}</span>
+                  </div>
+                  <label className="field platform-key">
+                    <span>{t('platform.mpesaMessage')}</span>
+                    <input
+                      value={notes[r.business_id] ?? r.admin_note ?? ''}
+                      onChange={(e) => setNotes({ ...notes, [r.business_id]: e.target.value })}
+                      maxLength={160}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <div className="btn-pair">
+                    <button type="button" className="btn btn-quiet btn-small" disabled={r.status === 'in_progress'} onClick={() => void moveRequest(r, 'in_progress')}>
+                      {t('platform.mpesaStart')}
+                    </button>
+                    <button type="button" className="btn btn-quiet btn-small ink-red" disabled={r.status === 'rejected'} onClick={() => void moveRequest(r, 'rejected')}>
+                      {t('platform.mpesaReject')}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

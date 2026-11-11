@@ -1609,6 +1609,30 @@ a.btn {
   font-size: 14px;
 }
 
+/* M-Pesa requests */
+.dot-bad {
+  background: var(--red);
+}
+
+.mpesa-status {
+  margin: 8px 0 12px;
+}
+
+.mpesa-note {
+  margin: 0 0 12px;
+}
+
+.segmented-4 {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.segmented-4 .segment {
+  padding: 0 4px;
+  font-size: 14px;
+}
+
 /* Platform admin */
 .segmented-3 {
   grid-template-columns: repeat(3, 1fr);

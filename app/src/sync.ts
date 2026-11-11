@@ -54,6 +54,7 @@ const specs: Spec[] = [
   { local: table(db.customers), remote: 'ck_customers', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.voiceAliases), remote: 'ck_voice_aliases', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.suppliers), remote: 'ck_suppliers', appendOnly: false, time: updatedAt, columns: shop },
+  { local: table(db.mpesaLinks), remote: 'ck_mpesa_links', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.supplierMoves), remote: 'ck_supplier_moves', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.entries), remote: 'ck_entries', appendOnly: false, time: updatedAt, columns: shop },
   { local: table(db.entryVersions), remote: 'ck_entry_versions', appendOnly: true, time: (r) => num(r.changedAt), columns: shop },

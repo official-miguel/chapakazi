@@ -71,6 +71,33 @@ export async function saveGeminiKey(key: string): Promise<void> {
   if (error) throw error
 }
 
+export type MpesaRequest = {
+  business_id: string
+  shop: string | null
+  owner_email: string | null
+  kind: 'till' | 'paybill'
+  shortcode: string
+  name: string | null
+  status: 'requested' | 'in_progress' | 'active' | 'rejected'
+  admin_note: string | null
+  changed_at: string
+}
+
+/** Every shop's request for an M-Pesa connection, waiting ones first. */
+export async function loadMpesaRequests(): Promise<MpesaRequest[]> {
+  if (!supabase) throw new Error('No server')
+  const { data, error } = await supabase.rpc('ck_admin_mpesa_requests')
+  if (error) throw error
+  return data as MpesaRequest[]
+}
+
+/** Moves a request along. The note is shown to the shop owner. */
+export async function setMpesaStatus(businessId: string, status: MpesaRequest['status'], note: string): Promise<void> {
+  if (!supabase) throw new Error('No server')
+  const { error } = await supabase.rpc('ck_admin_set_mpesa_status', { p_business: businessId, p_status: status, p_note: note })
+  if (error) throw error
+}
+
 /** True if the signed-in login is a platform admin. Asked from the server once per sign-in. */
 export function usePlatformAdmin(): boolean {
   const { signedIn, email } = useSyncState()
