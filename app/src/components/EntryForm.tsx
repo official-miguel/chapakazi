@@ -81,6 +81,7 @@ export function EntryForm({
   editing,
   forCustomer,
   draft,
+  onSaved,
   onClose,
 }: {
   kind: EntryKind
@@ -90,6 +91,8 @@ export function EntryForm({
   forCustomer?: Customer
   /** Values to start a new entry with, for example what was understood from voice. */
   draft?: EntryDraft
+  /** Told what was saved for a new entry, so voice can learn from a correction. */
+  onSaved?: (saved: { lines: EntryLine[]; customerId?: string; category?: ExpenseCategory }) => void
   onClose: () => void
 }) {
   const { t } = useI18n()
@@ -218,6 +221,8 @@ export function EntryForm({
       if (editing) await editEntry(editing.id, data, actor)
       else await recordEntry(shopId, data, actor, customer?.id)
       toast(t('entry.saved'))
+      // After the "Saved" message, so anything the caller wants to say is what stays on screen.
+      if (!editing) onSaved?.({ lines: finalLines, customerId: customer?.id, category: data.category })
       onClose()
     } finally {
       setSaving(false)

@@ -185,6 +185,18 @@ export interface Customer {
   updatedAt: number
 }
 
+/** A word the shop taught the voice feature: "omo" means this item, "mama njeri" means this customer. */
+export interface VoiceAlias {
+  id: string
+  businessId: string
+  /** The words as spoken, lower case. */
+  phrase: string
+  target: 'item' | 'customer' | 'category'
+  /** The item id, the customer id, or the expense category. */
+  targetId: string
+  updatedAt: number
+}
+
 /** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
 export type Synced<T> = T & { dirty?: number }
 
@@ -200,6 +212,7 @@ export const db = new Dexie('chapa-kazi') as Dexie & {
   itemCosts: EntityTable<Synced<ItemCost>, 'id'>
   lineCosts: EntityTable<Synced<LineCost>, 'id'>
   stockMoves: EntityTable<Synced<StockMove>, 'id'>
+  voiceAliases: EntityTable<Synced<VoiceAlias>, 'id'>
 }
 
 db.version(1).stores({
@@ -264,6 +277,10 @@ db.version(5)
       await tx.table(table).toCollection().modify({ dirty: 1 })
     }
   })
+
+db.version(6).stores({
+  voiceAliases: 'id, businessId, dirty',
+})
 
 /** A database transaction that is applying records from the server, not a change made on this phone. */
 type MaybeRemote = { fromServer?: boolean }

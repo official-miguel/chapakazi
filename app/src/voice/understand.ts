@@ -1,4 +1,4 @@
-import type { Customer, EntryKind, ExpenseCategory, Item, PayMethod } from '../db'
+import type { Customer, EntryKind, ExpenseCategory, Item, PayMethod, VoiceAlias } from '../db'
 import { round3 } from '../stock'
 import { isNumberWord, readNumber } from './numbers'
 
@@ -26,17 +26,22 @@ export type VoiceDraft = {
   /** A name that was said but is not a customer yet. */
   newCustomerName?: string
   note?: string
+  /** Words nothing could explain. If the person fixes the entry by hand, these are what get learned. */
+  unknown: string[]
   sure: boolean
 }
 
+/** What the reader knows about the shop. */
+export type ShopWords = { items: Item[]; customers: Customer[]; aliases?: VoiceAlias[] }
+
 const words = (list: string) => new Set(list.split(' '))
 
-const MPESA = words('mpesa till paybill')
-const CASH = words('cash kash taslimu')
-const CREDIT = words('deni credit mkopo amekopa anadaiwa kopesha nimemkopesha madeni')
-const PAID_DEBT = words('amelipa alilipa amerudisha ameleta amemaliza paid payment malipo pays repaid')
-const EXPENSE = words('expense expenses matumizi nimelipa tumelipa nimetumia tumetumia spent')
-const SALE = words('sale sales sold nimeuza ameuza tumeuza mauzo uza')
+export const MPESA = words('mpesa till paybill')
+export const CASH = words('cash kash taslimu')
+export const CREDIT = words('deni credit mkopo amekopa anadaiwa kopesha nimemkopesha madeni')
+export const PAID_DEBT = words('amelipa alilipa amerudisha ameleta amemaliza paid payment malipo pays repaid')
+export const EXPENSE = words('expense expenses matumizi nimelipa tumelipa nimetumia tumetumia spent')
+export const SALE = words('sale sales sold nimeuza ameuza tumeuza mauzo uza')
 const MONEY = words('shillings shilling shilingi bob ksh kes sh')
 const FILLER = words(
   'na ya wa kwa za la ni the a an of for to and at on in is ile hii hiyo amechukua amenunua alichukua took bought buys from kutoka',
@@ -86,7 +91,7 @@ const SAME_GOODS = [
 ].map((group) => group.split(' '))
 const sameGoods = (a: string, b: string) => SAME_GOODS.some((group) => group.includes(a) && group.includes(b))
 
-function normalise(text: string): string[] {
+export function normalise(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/m[\s-]*pesa/g, 'mpesa')
@@ -127,7 +132,7 @@ const same = (said: string, name: string) =>
   close(said, name) || close(said.replace(/s$/, ''), name.replace(/s$/, '')) || sameGoods(said, name)
 
 /** Finds where a name (one or more words) was said. Returns the span, or null. */
-function findName(said: string[], taken: boolean[], name: string): [number, number] | null {
+export function findName(said: string[], taken: boolean[], name: string): [number, number] | null {
   const parts = normalise(name)
   if (parts.length === 0) return null
   for (let start = 0; start + parts.length <= said.length; start++) {
@@ -145,7 +150,7 @@ function findName(said: string[], taken: boolean[], name: string): [number, numb
 
 const capitalise = (word: string) => word.charAt(0).toUpperCase() + word.slice(1)
 
-export function understand(text: string, shop: { items: Item[]; customers: Customer[] }): VoiceDraft {
+export function understand(text: string, shop: ShopWords): VoiceDraft {
   const said = normalise(text)
   const taken = said.map(() => false)
   const take = (from: number, to: number) => {
@@ -159,9 +164,29 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
   takeAll(MPESA)
   takeAll(CASH)
 
-  // --- who (longest names first, so "Mary Wanjiku" wins over "Mary")
+  // --- words this shop has taught it come first
   let customer: Customer | undefined
-  for (const c of [...shop.customers].sort((a, b) => b.name.length - a.name.length)) {
+  let taughtCategory: ExpenseCategory | undefined
+  const spans: { item: Item; start: number; end: number }[] = []
+  for (const alias of [...(shop.aliases ?? [])].sort((a, b) => b.phrase.length - a.phrase.length)) {
+    const span = findName(said, taken, alias.phrase)
+    if (!span) continue
+    if (alias.target === 'item') {
+      const item = shop.items.find((i) => i.id === alias.targetId)
+      if (!item) continue
+      spans.push({ item, start: span[0], end: span[1] })
+    } else if (alias.target === 'customer') {
+      const known = shop.customers.find((c) => c.id === alias.targetId)
+      if (!known || customer) continue
+      customer = known
+    } else {
+      taughtCategory = alias.targetId as ExpenseCategory
+    }
+    take(...span)
+  }
+
+  // --- who (longest names first, so "Mary Wanjiku" wins over "Mary")
+  for (const c of customer ? [] : [...shop.customers].sort((a, b) => b.name.length - a.name.length)) {
     const span = findName(said, taken, c.name)
     if (span) {
       customer = c
@@ -171,7 +196,6 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
   }
 
   // --- which of the shop's items were named
-  const spans: { item: Item; start: number; end: number }[] = []
   for (const item of [...shop.items].sort((a, b) => b.name.length - a.name.length)) {
     const span = findName(said, taken, item.name)
     if (span) {
@@ -183,8 +207,8 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
 
   // --- what kind of entry
   // A word like "maji" means the water bill, unless this shop sells water and that is what was named.
-  let category: ExpenseCategory | undefined
-  for (const [id, set] of CATEGORY) {
+  let category: ExpenseCategory | undefined = taughtCategory
+  for (const [id, set] of category ? [] : CATEGORY) {
     if (said.some((w, i) => set.has(w) && !taken[i])) {
       category = id
       break
@@ -199,7 +223,7 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
   else kind = 'sale'
   if (kind !== 'expense') category = undefined
   // For an expense the bill word counts even if the shop also sells that thing.
-  else category = CATEGORY.find(([, set]) => has(set))?.[0] ?? 'other'
+  else category = taughtCategory ?? CATEGORY.find(([, set]) => has(set))?.[0] ?? 'other'
 
   takeAll(CREDIT)
   takeAll(PAID_DEBT)
@@ -273,6 +297,9 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
   let amountNumber: Num | undefined = free.find((n) => n.money) ?? [...free].sort((a, b) => b.value - a.value)[0]
   // "… tatu" left over beside priced items is far more likely a missed quantity than KSh 3.
   if (amountNumber && !amountNumber.money && linesTotal > 0 && amountNumber.value * 100 < linesTotal / 2) amountNumber = undefined
+  // Nothing costs two shillings: a bare "mbili" beside an unknown word is a quantity of something
+  // it did not recognise, so it is left unexplained rather than saved as money.
+  if (amountNumber && !amountNumber.money && amountNumber.value < 5) amountNumber = undefined
   let amountCents: number | null = null
   if (!amountNumber && linesTotal > 0) amountCents = linesTotal
   if (amountNumber) {
@@ -289,6 +316,7 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
 
   // --- words nobody claimed
   const leftover = said.filter((w, i) => !taken[i] && !FILLER.has(w) && !isNumberWord(w))
+  const unknown = [...leftover]
 
   // A name after credit or payment words that is not a known customer becomes a new one.
   let newCustomerName: string | undefined
@@ -316,6 +344,7 @@ export function understand(text: string, shop: { items: Item[]; customers: Custo
     customer,
     newCustomerName,
     note: lines.length > 0 && kind !== 'expense' ? undefined : note,
+    unknown,
     sure,
   }
 }
