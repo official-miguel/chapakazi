@@ -34,6 +34,7 @@ export type ItemInput = {
   priceCents?: number
   lowAt?: number
   tracked: boolean
+  supplierId?: string
 }
 
 /** Adds one stock movement and keeps the item's running total in step. Call inside a transaction. */

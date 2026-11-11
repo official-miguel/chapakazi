@@ -1,6 +1,7 @@
 import { db } from './db'
 import { entriesBetween, startOfDay } from './ledger'
 import { needsRestock } from './stock'
+import { owedBySupplier } from './suppliers'
 
 // The numbers behind the Analysis screen, worked out on the phone from the shop's own records.
 //
@@ -44,6 +45,8 @@ export type Analysis = {
   byWeekday: number[]
   perShop: { id: string; salesCents: number; expensesCents: number; salesCount: number }[]
   owedCents: number
+  /** What the shop owes its suppliers. */
+  owedToSuppliersCents: number
   lowStock: number
 }
 
@@ -53,6 +56,7 @@ export async function analyse(shopIds: string[], from: number, to: number): Prom
   const entries = (await entriesBetween(shopIds, from, to)).filter((e) => !e.cancelled)
   const items = (await db.items.where('businessId').anyOf(shopIds).toArray()).filter((i) => !i.archived)
   const customers = await db.customers.where('businessId').anyOf(shopIds).toArray()
+  const supplierDebts = owedBySupplier(await db.supplierMoves.where('businessId').anyOf(shopIds).toArray())
 
   const result: Analysis = {
     salesCents: 0,
@@ -68,6 +72,7 @@ export async function analyse(shopIds: string[], from: number, to: number): Prom
     byWeekday: new Array<number>(7).fill(0),
     perShop: shopIds.map((id) => ({ id, salesCents: 0, expensesCents: 0, salesCount: 0 })),
     owedCents: customers.reduce((sum, c) => sum + Math.max(0, c.balanceCents), 0),
+    owedToSuppliersCents: [...supplierDebts.values()].reduce((sum, v) => sum + Math.max(0, v), 0),
     lowStock: items.filter(needsRestock).length,
   }
 

@@ -103,6 +103,7 @@ export function AnalysisScreen() {
     if (a.expensesCents > 0) lines.push(t('sum.expenses', { amount: money(a.expensesCents) }))
     if (a.lowStock > 0) lines.push(t(a.lowStock === 1 ? 'sum.lowOne' : 'sum.low', { n: a.lowStock }))
     if (a.owedCents > 0) lines.push(t('sum.owed', { amount: money(a.owedCents) }))
+    if (a.owedToSuppliersCents > 0) lines.push(t('sum.owedSuppliers', { amount: money(a.owedToSuppliersCents) }))
     return lines
   }
 
@@ -267,6 +268,11 @@ export function AnalysisScreen() {
           <section className="card card-gap">
             <h2 className="card-title">{t('debts.total')}</h2>
             <p className={`total-value ${data.owedCents > 0 ? 'ink-amber' : ''}`}>{formatKsh(data.owedCents)}</p>
+          </section>
+
+          <section className="card card-gap">
+            <h2 className="card-title">{t('sup.youOwe')}</h2>
+            <p className={`total-value ${data.owedToSuppliersCents > 0 ? 'ink-amber' : ''}`}>{formatKsh(data.owedToSuppliersCents)}</p>
           </section>
         </>
       )}

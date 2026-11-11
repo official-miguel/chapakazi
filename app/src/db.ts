@@ -88,6 +88,8 @@ export interface Item {
   priceCents?: number
   /** Warn when stock drops to this level. */
   lowAt?: number
+  /** Who the shop buys this item from, if the owner has said. */
+  supplierId?: string
   /** False for things that are not counted, like a haircut. */
   tracked: boolean
   /** Stock left. Always equals the sum of this item's StockMove rows. */
@@ -215,6 +217,32 @@ export interface CashCount {
   at: number
 }
 
+/** Someone the shop buys stock from. Owners only. */
+export interface Supplier {
+  id: string
+  businessId: string
+  name: string
+  phone?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** Goods taken on credit from a supplier ("purchase"), or money paid to them ("payment"). */
+export interface SupplierMove {
+  id: string
+  businessId: string
+  supplierId: string
+  kind: 'purchase' | 'payment'
+  amountCents: number
+  method?: 'cash' | 'mpesa'
+  note?: string
+  byPersonId: string
+  at: number
+  /** Set when the record was taken back as a mistake. It is kept, but no longer counted. */
+  undoneAt?: number
+  updatedAt: number
+}
+
 /** Every saved record also carries a flag: 1 means "changed on this phone and not yet backed up". */
 export type Synced<T> = T & { dirty?: number }
 
@@ -232,6 +260,8 @@ export const db = new Dexie('chapa-kazi') as Dexie & {
   stockMoves: EntityTable<Synced<StockMove>, 'id'>
   voiceAliases: EntityTable<Synced<VoiceAlias>, 'id'>
   cashCounts: EntityTable<Synced<CashCount>, 'id'>
+  suppliers: EntityTable<Synced<Supplier>, 'id'>
+  supplierMoves: EntityTable<Synced<SupplierMove>, 'id'>
 }
 
 db.version(1).stores({
@@ -303,6 +333,11 @@ db.version(6).stores({
 
 db.version(7).stores({
   cashCounts: 'id, businessId, dirty',
+})
+
+db.version(8).stores({
+  suppliers: 'id, businessId, dirty',
+  supplierMoves: 'id, businessId, supplierId, dirty',
 })
 
 /** A database transaction that is applying records from the server, not a change made on this phone. */

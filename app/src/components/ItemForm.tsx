@@ -1,5 +1,7 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { db } from '../db'
 import type { Item } from '../db'
 import { useI18n } from '../i18n'
 import { parseAmount } from '../ledger'
@@ -36,7 +38,13 @@ export function ItemForm({
   const [opening, setOpening] = useState('')
   const [lowAt, setLowAt] = useState(editing?.lowAt !== undefined ? String(editing.lowAt) : '')
   const [shopId, setShopId] = useState(editing?.businessId ?? shops[0]?.id ?? '')
+  const [supplierId, setSupplierId] = useState(editing?.supplierId ?? '')
   const [showError, setShowError] = useState(false)
+  // Suppliers are the owner's business, so only the owner's form offers them.
+  const suppliers = useLiveQuery(
+    async () => (isAdmin && shopId ? await db.suppliers.where('businessId').equals(shopId).sortBy('name') : []),
+    [isAdmin, shopId],
+  )
   const [saving, setSaving] = useState(false)
 
   if (!person) return null
@@ -66,6 +74,8 @@ export function ItemForm({
         priceCents: priceCents ?? undefined,
         lowAt: tracked ? (lowLevel ?? undefined) : undefined,
         tracked,
+        // A worker's save keeps whatever supplier the owner chose.
+        supplierId: isAdmin ? supplierId || undefined : editing?.supplierId,
       }
       if (editing) {
         // Only the owner's form may touch the buying price; a worker's save leaves it as it was.
@@ -132,6 +142,28 @@ export function ItemForm({
             <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" autoComplete="off" />
             <small>{t('stock.costHint')}</small>
           </label>
+        )}
+
+        {isAdmin && suppliers && suppliers.length > 0 && (
+          <div className="field">
+            <span>{t('sup.boughtFrom')}</span>
+            <div className="chips">
+              <button type="button" className={supplierId === '' ? 'chip chip-on' : 'chip'} aria-pressed={supplierId === ''} onClick={() => setSupplierId('')}>
+                {t('sup.none')}
+              </button>
+              {suppliers.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={s.id === supplierId ? 'chip chip-on' : 'chip'}
+                  aria-pressed={s.id === supplierId}
+                  onClick={() => setSupplierId(s.id)}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         <label className="check">
