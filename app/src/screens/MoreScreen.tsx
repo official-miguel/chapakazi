@@ -1,7 +1,9 @@
 import { Banknote, ChartColumn, ChevronRight, FileText, Inbox, Lock, LogOut, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { signOutAccount } from '../account'
-import { BackupCard, usePendingCount } from '../components/BackupCard'
+import { AccountFailure, signOutAccount } from '../account'
+import type { AccountError } from '../account'
+import { BackupCard } from '../components/BackupCard'
 import { useSyncState } from '../sync'
 import { useI18n } from '../i18n'
 import type { Lang } from '../i18n'
@@ -20,7 +22,8 @@ export function MoreScreen() {
   const online = useOnline()
   const platformAdmin = usePlatformAdmin()
   const sync = useSyncState()
-  const pending = usePendingCount()
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<AccountError | null>(null)
 
   return (
     <>
@@ -134,17 +137,32 @@ export function MoreScreen() {
       </button>
 
       {sync.signedIn && (
-        <button
-          type="button"
-          className="btn btn-quiet"
-          onClick={async () => {
-            if (pending > 0 && !window.confirm(t('more.signOutWarn'))) return
-            await signOutAccount()
-            lock()
-          }}
-        >
-          <LogOut size={20} aria-hidden /> {t('more.signOut')}
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            disabled={signingOut}
+            onClick={async () => {
+              if (!window.confirm(t('more.signOutWarn'))) return
+              setSignOutError(null)
+              setSigningOut(true)
+              try {
+                // Clears this phone and reloads the app on its first page.
+                await signOutAccount()
+              } catch (failure) {
+                setSignOutError(failure instanceof AccountFailure ? failure.key : 'err.other')
+                setSigningOut(false)
+              }
+            }}
+          >
+            <LogOut size={20} aria-hidden /> {t('more.signOut')}
+          </button>
+          {signOutError && (
+            <p className="field-error" role="alert">
+              {t(signOutError)}
+            </p>
+          )}
+        </>
       )}
 
       <p className="footnote">

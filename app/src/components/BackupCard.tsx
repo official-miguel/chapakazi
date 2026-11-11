@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CloudOff, CloudUpload, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { AccountFailure, createOwnerAccount } from '../account'
+import { AccountFailure, createOwnerAccount, signInReplacingPhone } from '../account'
 import type { AccountError } from '../account'
 import { useI18n } from '../i18n'
 import { useSession } from '../session'
@@ -26,6 +26,7 @@ export function BackupCard() {
   const online = useOnline()
   const { dateTime } = useTimeFormat()
   const [creating, setCreating] = useState(false)
+  const [mode, setMode] = useState<'create' | 'signin'>('create')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<AccountError | null>(null)
@@ -39,6 +40,12 @@ export function BackupCard() {
     setWorking(true)
     setError(null)
     try {
+      if (mode === 'signin') {
+        if (!window.confirm(t('backup.signInWarn'))) return
+        // Clears this phone's records and reloads the app with the account's own.
+        await signInReplacingPhone(email, password)
+        return
+      }
       await createOwnerAccount(email, password, person.id)
       setCreating(false)
       setPassword('')
@@ -59,12 +66,28 @@ export function BackupCard() {
         </p>
         {isAdmin && (
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            <CloudUpload size={22} aria-hidden /> {t('backup.create')}
+            <CloudUpload size={22} aria-hidden /> {t('backup.create')} / {t('account.signIn')}
           </button>
         )}
 
         {creating && (
-          <Sheet title={t('backup.create')} onClose={() => setCreating(false)}>
+          <Sheet title={`${t('backup.create')} / ${t('account.signIn')}`} onClose={() => setCreating(false)}>
+            <div className="segmented">
+              {(['create', 'signin'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={m === mode ? 'segment segment-on' : 'segment'}
+                  aria-pressed={m === mode}
+                  onClick={() => {
+                    setMode(m)
+                    setError(null)
+                  }}
+                >
+                  {m === 'create' ? t('backup.create') : t('account.signIn')}
+                </button>
+              ))}
+            </div>
             <form onSubmit={create}>
               <label className="field">
                 <span>{t('backup.email')}</span>
@@ -76,8 +99,8 @@ export function BackupCard() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={8}
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  minLength={mode === 'signin' ? undefined : 8}
                   required
                 />
               </label>
@@ -87,7 +110,7 @@ export function BackupCard() {
                 </p>
               )}
               <button type="submit" className="btn btn-primary" disabled={working}>
-                {t('backup.create')}
+                {mode === 'signin' ? t('account.signIn') : t('backup.create')}
               </button>
             </form>
           </Sheet>

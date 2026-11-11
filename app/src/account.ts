@@ -1,6 +1,7 @@
+import { db } from './db'
 import type { WordKey } from './i18n'
 import { supabase } from './supabase'
-import { setDevicePerson, syncNow } from './sync'
+import { countPending, setDevicePerson, syncNow } from './sync'
 
 // Accounts. An owner signs in with email and password. A worker has no email: their own phone
 // is linked to the shop with the invite code the owner gave them.
@@ -71,17 +72,44 @@ export async function signInOwner(email: string, password: string): Promise<bool
 }
 
 /**
- * Signs this phone out of its account. Tries to send waiting changes first. Records stay on the
- * phone and are sent when someone signs in again.
+ * Signs this phone out of its account and returns it to the first page, as if freshly installed.
+ * Everything on the phone is a copy of what is backed up, so it is cleared, but only after every
+ * waiting record has been sent. If some cannot be sent (offline, say) nothing is changed and
+ * 'err.signOutUnsent' is thrown, so no record is ever lost.
  */
 export async function signOutAccount(): Promise<void> {
   if (!supabase) return
-  try {
-    await syncNow()
-  } catch {
-    // Offline or failing: sign out anyway.
-  }
+  await syncNow()
+  if ((await countPending()) > 0) throw new AccountFailure('err.signOutUnsent')
+
   await supabase.auth.signOut()
+  await wipePhone(false)
+  // A fresh start of the app, so nothing from the last account stays in memory.
+  window.location.assign('/')
+}
+
+/** Empties this phone of records and of its own notes, keeping the chosen language (and the login if asked). */
+async function wipePhone(keepLogin: boolean): Promise<void> {
+  await Promise.all(db.tables.map((table) => table.clear()))
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('ck.') && key !== 'ck.lang' && !(keepLogin && key === 'ck.auth')) localStorage.removeItem(key)
+    }
+    sessionStorage.clear()
+  } catch {
+    // Storage blocked: nothing more to clear.
+  }
+}
+
+/**
+ * Someone who already has an account signs in on a phone that holds other records. Those records
+ * are replaced by the account's own. Nothing is touched if the email or password is wrong.
+ */
+export async function signInReplacingPhone(email: string, password: string): Promise<void> {
+  await signIn(email.trim().toLowerCase(), password)
+  await wipePhone(true)
+  await signInOwner(email, password)
+  window.location.assign('/')
 }
 
 /** A worker links their own phone to the shop with the owner's invite code. */
