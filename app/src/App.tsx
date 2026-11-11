@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { I18nProvider } from './i18n'
 import { BusinessesScreen } from './screens/BusinessesScreen'
 import { CashCountScreen } from './screens/CashCountScreen'
+import { HealthReportScreen } from './screens/HealthReportScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockScreen } from './screens/LockScreen'
 import { MoreScreen } from './screens/MoreScreen'
@@ -46,6 +47,7 @@ function Gate() {
         {isAdmin && <Route path="alerts" element={<AlertsScreen />} />}
         {isAdmin && <Route path="analysis" element={<AnalysisScreen />} />}
         {isAdmin && <Route path="suppliers" element={<SuppliersScreen />} />}
+        {isAdmin && <Route path="health-report" element={<HealthReportScreen />} />}
         {/* The page for whoever runs Chapa Kazi. The server refuses everyone else regardless. */}
         {platformAdmin && <Route path="platform" element={<PlatformScreen />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

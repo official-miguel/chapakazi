@@ -1404,6 +1404,125 @@ a.btn {
   overflow-wrap: anywhere;
 }
 
+/* Business health report: looks like a sheet of paper on screen, and prints as one page. */
+.report-intro {
+  margin: 0 0 12px;
+}
+
+.report {
+  margin-bottom: 12px;
+  padding: 20px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.report header {
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--text);
+}
+
+.report header h2 {
+  margin: 2px 0 4px;
+  font-size: 23px;
+  font-weight: 600;
+}
+
+.report header p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.report .report-kicker {
+  color: var(--green-ink);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.report h3 {
+  margin: 18px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.report-figures {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 6px;
+}
+
+.report-figures div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-figures span {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.report-figures b {
+  font-size: 21px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.report-table th {
+  padding-right: 12px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.report-table td {
+  font-size: 14px;
+}
+
+.report-empty {
+  margin: 16px 0;
+}
+
+.report footer {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+@media print {
+  .topbar,
+  .bottombar,
+  .mic,
+  .toast,
+  .no-print {
+    display: none !important;
+  }
+
+  .app {
+    max-width: none;
+  }
+
+  .content {
+    padding: 0;
+  }
+
+  .report {
+    border: 0;
+    padding: 0;
+  }
+
+  .report .warn-note {
+    border: 1px solid #999;
+    background: none;
+    color: #000;
+  }
+}
+
 /* Suppliers and orders */
 .order-group + .order-group {
   margin-top: 16px;

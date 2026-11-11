@@ -1,4 +1,4 @@
-import { Banknote, ChartColumn, ChevronRight, Lock, ShieldCheck, Store, Truck, UserPlus } from 'lucide-react'
+import { Banknote, ChartColumn, ChevronRight, FileText, Lock, ShieldCheck, Store, Truck, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BackupCard } from '../components/BackupCard'
 import { useI18n } from '../i18n'
@@ -38,6 +38,13 @@ export function MoreScreen() {
             <ChartColumn size={24} aria-hidden />
             <span className="list-main">
               <span className="list-title">{t('analysis.title')}</span>
+            </span>
+            <ChevronRight size={22} aria-hidden />
+          </Link>
+          <Link to="/health-report" className="list-row">
+            <FileText size={24} aria-hidden />
+            <span className="list-main">
+              <span className="list-title">{t('health.title')}</span>
             </span>
             <ChevronRight size={22} aria-hidden />
           </Link>
