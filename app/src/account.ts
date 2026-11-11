@@ -70,6 +70,20 @@ export async function signInOwner(email: string, password: string): Promise<bool
   return personId !== null
 }
 
+/**
+ * Signs this phone out of its account. Tries to send waiting changes first. Records stay on the
+ * phone and are sent when someone signs in again.
+ */
+export async function signOutAccount(): Promise<void> {
+  if (!supabase) return
+  try {
+    await syncNow()
+  } catch {
+    // Offline or failing: sign out anyway.
+  }
+  await supabase.auth.signOut()
+}
+
 /** A worker links their own phone to the shop with the owner's invite code. */
 export async function joinWithCode(code: string): Promise<void> {
   // The phone invents the password; the worker never needs to know it.

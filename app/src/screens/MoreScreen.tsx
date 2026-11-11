@@ -1,6 +1,8 @@
-import { Banknote, ChartColumn, ChevronRight, FileText, Inbox, Lock, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
+import { Banknote, ChartColumn, ChevronRight, FileText, Inbox, Lock, LogOut, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { BackupCard } from '../components/BackupCard'
+import { signOutAccount } from '../account'
+import { BackupCard, usePendingCount } from '../components/BackupCard'
+import { useSyncState } from '../sync'
 import { useI18n } from '../i18n'
 import type { Lang } from '../i18n'
 import { usePlatformAdmin } from '../platform'
@@ -17,6 +19,8 @@ export function MoreScreen() {
   const { isAdmin, lock } = useSession()
   const online = useOnline()
   const platformAdmin = usePlatformAdmin()
+  const sync = useSyncState()
+  const pending = usePendingCount()
 
   return (
     <>
@@ -128,6 +132,20 @@ export function MoreScreen() {
       <button type="button" className="btn btn-quiet" onClick={lock}>
         <Lock size={20} aria-hidden /> {t('switch.lock')}
       </button>
+
+      {sync.signedIn && (
+        <button
+          type="button"
+          className="btn btn-quiet"
+          onClick={async () => {
+            if (pending > 0 && !window.confirm(t('more.signOutWarn'))) return
+            await signOutAccount()
+            lock()
+          }}
+        >
+          <LogOut size={20} aria-hidden /> {t('more.signOut')}
+        </button>
+      )}
 
       <p className="footnote">
         Chapa Kazi · {t('more.version')} {__APP_VERSION__}
