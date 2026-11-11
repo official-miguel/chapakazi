@@ -19,7 +19,8 @@ const lastViewKey = (personId: string) => `ck.lastView.${personId}`
 
 /**
  * Everything this person may open.
- * - An owner (admin) of a shop can also step into the worker view of that shop.
+ * - An owner (admin) of a shop can also step into the worker view of that shop, but only once
+ *   they have added a worker to it.
  * - A worker sees only the shop they were added to.
  * - An owner of two or more shops also gets a combined "all businesses" view.
  */
@@ -30,7 +31,10 @@ export function viewsFor(personId: string, dir: Directory): View[] {
   const views: View[] = []
   for (const b of dir.businesses) {
     if (adminOf.has(b.id)) {
-      views.push({ businessId: b.id, role: 'admin' }, { businessId: b.id, role: 'worker' })
+      views.push({ businessId: b.id, role: 'admin' })
+      // The worker view is only worth having once the owner has added a worker to this shop.
+      const hasWorker = dir.memberships.some((m) => m.businessId === b.id && m.role === 'worker' && !m.removedAt && m.personId !== personId)
+      if (hasWorker) views.push({ businessId: b.id, role: 'worker' })
     } else if (workerOf.has(b.id)) {
       views.push({ businessId: b.id, role: 'worker' })
     }
