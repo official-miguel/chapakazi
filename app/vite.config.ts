@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'favicon.png', 'logo.svg'],
       manifest: {
-        name: 'Chapa Kazi',
-        short_name: 'Chapa Kazi',
+        name: 'Chapa Biz',
+        short_name: 'Chapa Biz',
         description: 'The simple business ledger for shops in Kenya.',
         lang: 'en',
         start_url: '/',

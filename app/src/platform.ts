@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { useSyncState } from './sync'
 
-// The platform admin: the person who runs Chapa Kazi (not a shop owner). They can see which
+// The platform admin: the person who runs Chapa Biz (not a shop owner). They can see which
 // shops and people use the app and how active they are. By design this shows activity only:
 // no money amounts, no customer names. The server decides who is an admin and what they get.
 

@@ -53,7 +53,7 @@ function Gate() {
         {isAdmin && <Route path="suppliers" element={<SuppliersScreen />} />}
         {isAdmin && <Route path="health-report" element={<HealthReportScreen />} />}
         {isAdmin && <Route path="mpesa" element={<MpesaScreen />} />}
-        {/* The page for whoever runs Chapa Kazi. The server refuses everyone else regardless. */}
+        {/* The page for whoever runs Chapa Biz. The server refuses everyone else regardless. */}
         {platformAdmin && <Route path="platform" element={<PlatformScreen />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

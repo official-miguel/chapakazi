@@ -21,7 +21,7 @@ import { useTimeFormat } from '../useTimeFormat'
 
 type Tab = 'shops' | 'people' | 'mpesa' | 'settings'
 
-/** Platform admin only: who is using Chapa Kazi and how active they are. Activity only, no money. */
+/** Platform admin only: who is using Chapa Biz and how active they are. Activity only, no money. */
 export function PlatformScreen() {
   const { t } = useI18n()
   const { dateTime } = useTimeFormat()

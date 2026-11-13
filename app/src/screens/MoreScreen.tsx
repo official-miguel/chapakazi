@@ -166,7 +166,7 @@ export function MoreScreen() {
       )}
 
       <p className="footnote">
-        Chapa Kazi · {t('more.version')} {__APP_VERSION__}
+        Chapa Biz · {t('more.version')} {__APP_VERSION__}
       </p>
     </>
   )

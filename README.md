@@ -1,4 +1,4 @@
-# Chapa Kazi
+# Chapa Biz
 
 A simple business ledger for small shops in Kenya. It replaces the notebook: sales, expenses, stock, and customer debts, in English and Swahili. It is an installable web app that works with no internet.
 

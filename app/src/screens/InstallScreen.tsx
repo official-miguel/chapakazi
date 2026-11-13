@@ -20,14 +20,14 @@ export function InstallScreen() {
   return (
     <div className="install">
       <img src="/logo.svg" alt="" width={96} height={96} className="install-logo" />
-      <h1>Chapa Kazi</h1>
+      <h1>Chapa Biz</h1>
       <p className="install-tag">Hustle smarter, not harder.</p>
 
       {installed ? (
         <>
-          <p className="install-msg">Chapa Kazi is installed on this phone.</p>
+          <p className="install-msg">Chapa Biz is installed on this phone.</p>
           <Link className="btn btn-primary install-btn" to="/">
-            Open Chapa Kazi
+            Open Chapa Biz
           </Link>
         </>
       ) : canPrompt ? (
@@ -46,7 +46,7 @@ export function InstallScreen() {
             Choose <SquarePlus size={16} className="inline" /> <b>Add to Home Screen</b>.
           </li>
           <li>
-            Tap <b>Add</b>, then open Chapa Kazi from your home screen.
+            Tap <b>Add</b>, then open Chapa Biz from your home screen.
           </li>
         </ol>
       ) : (

@@ -24,7 +24,7 @@ const known: Record<string, AccountError> = {
   bad_code: 'err.bad_code',
 }
 
-/** Logins are created by the server function "ck-auth", so they are always marked as Chapa Kazi logins. */
+/** Logins are created by the server function "ck-auth", so they are always marked as Chapa Biz logins. */
 async function callAuthFunction(body: Record<string, string>): Promise<Record<string, unknown>> {
   const url: string = import.meta.env.VITE_SUPABASE_URL
   const key: string = import.meta.env.VITE_SUPABASE_KEY

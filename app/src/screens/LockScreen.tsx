@@ -57,7 +57,7 @@ export function LockScreen() {
       <header className="topbar">
         <span className="brand">
           <img src="/logo.svg" alt="" />
-          Chapa <b>Kazi</b>
+          Chapa <b>Biz</b>
         </span>
       </header>
       <div className="gate-body">

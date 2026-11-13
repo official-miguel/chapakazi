@@ -102,7 +102,7 @@ export function Onboarding() {
         <div className="gate-body gate-center">
           <img src="/logo.svg" alt="" className="gate-logo" />
           <h1 className="gate-brand">
-            Chapa <b>Kazi</b>
+            Chapa <b>Biz</b>
           </h1>
           <p className="gate-tagline">{t('onboard.tagline')}</p>
           <button type="button" className="btn btn-primary" onClick={() => setStep('you')}>
