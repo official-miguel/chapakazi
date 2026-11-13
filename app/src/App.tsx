@@ -7,6 +7,7 @@ import { CashCountScreen } from './screens/CashCountScreen'
 import { HealthReportScreen } from './screens/HealthReportScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { InboxScreen } from './screens/InboxScreen'
+import { InstallScreen } from './screens/InstallScreen'
 import { LockScreen } from './screens/LockScreen'
 import { MoreScreen } from './screens/MoreScreen'
 import { MpesaScreen } from './screens/MpesaScreen'
@@ -67,9 +68,18 @@ export default function App() {
     <I18nProvider>
       <ToastProvider>
         <BrowserRouter>
-          <SessionProvider loading={<div className="app" />}>
-            <Gate />
-          </SessionProvider>
+          <Routes>
+            {/* Public download page, outside the login. */}
+            <Route path="install" element={<InstallScreen />} />
+            <Route
+              path="*"
+              element={
+                <SessionProvider loading={<div className="app" />}>
+                  <Gate />
+                </SessionProvider>
+              }
+            />
+          </Routes>
         </BrowserRouter>
       </ToastProvider>
     </I18nProvider>

@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "chapa-kazi-website",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "http-server", "website", "-p", "5200", "-c-1"],
+      "port": 5200
+    },
+    {
       "name": "chapa-kazi",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "app", "run", "dev"],

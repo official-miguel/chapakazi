@@ -1816,3 +1816,59 @@ a.btn {
     transition: none !important;
   }
 }
+
+/* Install page (public, linked from the website) */
+.install {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 32px 24px calc(32px + var(--safe-bottom));
+}
+.install-logo {
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.install h1 {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+.install-tag {
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+.install-btn {
+  width: 100%;
+  max-width: 320px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.install-fine,
+.install-msg {
+  color: var(--text-dim);
+  max-width: 320px;
+  margin: 4px 0 0;
+}
+.install-steps {
+  text-align: left;
+  max-width: 320px;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.install-steps .inline {
+  vertical-align: -3px;
+}
+.install-skip {
+  margin-top: 16px;
+  color: var(--green-ink);
+  font-size: 14px;
+}
