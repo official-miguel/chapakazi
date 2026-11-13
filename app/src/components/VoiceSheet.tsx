@@ -328,20 +328,23 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
               <li key={i}>{part}</li>
             ))}
           </ul>
-          {sure ? (
-            <>
-              <p className="voice-ask">{t('voice.correct')}</p>
-              <button
-                type="button"
-                className={pending.type === 'edit' && pending.edit.action === 'delete' ? 'btn btn-danger' : 'btn btn-primary'}
-                disabled={saving}
-                onClick={() => void confirm(pending)}
-              >
-                {t('voice.yes')}
-              </button>
-            </>
-          ) : (
-            <p className="warn-note">{t('voice.unsure')}</p>
+          {sure ? <p className="voice-ask">{t('voice.correct')}</p> : <p className="warn-note">{t('voice.unsure')}</p>}
+          {/* The save button is always there when there is something to save. */}
+          {(pending.type === 'new' ? !!pending.draft.amountCents : !!pending.edit.entry) && (
+            <button
+              type="button"
+              className={
+                pending.type === 'edit' && pending.edit.action === 'delete'
+                  ? 'btn btn-danger'
+                  : sure
+                    ? 'btn btn-primary'
+                    : 'btn btn-quiet'
+              }
+              disabled={saving}
+              onClick={() => void confirm(pending)}
+            >
+              {t('voice.yes')}
+            </button>
           )}
           <div className={pending.type === 'new' ? 'btn-pair' : undefined}>
             <button type="button" className="btn btn-quiet" onClick={again}>
