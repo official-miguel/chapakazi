@@ -17,7 +17,7 @@
   --logo-red: #d9412b;
   --bar-h: 68px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  color-scheme: light;
+  color-scheme: only light;
 }
 
 * {
