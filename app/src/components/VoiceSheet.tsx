@@ -241,16 +241,9 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
     setPending(next)
     setPhase('confirm')
 
-    // Read it back. Only a confident reading is offered for a spoken yes or no.
+    // No spoken read-back: it is shown on screen. Only a confident reading listens for a spoken yes or no.
     const isSure = next.type === 'new' ? next.draft.sure : next.edit.sure
-    const words = next.type === 'new' ? describeDraft(next.draft) : describeEdit(next.edit)
-    if (window.speechSynthesis) {
-      const speech = new SpeechSynthesisUtterance(`${words.join(', ')}. ${isSure ? t('voice.correct') : t('voice.unsure')}`)
-      speech.lang = speechLang
-      if (isSure) speech.onend = () => listen(next)
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(speech)
-    }
+    if (isSure) listen(next)
   }
 
   const submitTyped = (e: FormEvent) => {
