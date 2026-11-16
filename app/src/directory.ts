@@ -1,4 +1,4 @@
-import { db, newId, newInviteCode } from './db'
+import { cleanInviteCode, db, newId, newInviteCode } from './db'
 import type { BusinessType } from './db'
 import { hashPin } from './pin'
 
@@ -79,7 +79,7 @@ export async function removeWorker(membershipId: string): Promise<void> {
 
 /** A new worker's first sign-in: checks the invite code, then saves the PIN they chose. */
 export async function inviteCodeMatches(personId: string, code: string): Promise<boolean> {
-  const cleaned = code.trim().toUpperCase()
+  const cleaned = cleanInviteCode(code)
   const rows = await db.memberships.where('personId').equals(personId).toArray()
   return rows.some((m) => !m.removedAt && m.inviteCode !== undefined && m.inviteCode === cleaned)
 }

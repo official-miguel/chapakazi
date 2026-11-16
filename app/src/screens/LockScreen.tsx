@@ -2,6 +2,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PinPad } from '../components/PinPad'
+import { cleanInviteCode } from '../db'
 import type { Person } from '../db'
 import { inviteCodeMatches, setFirstPin, setOwnPin } from '../directory'
 import { useI18n } from '../i18n'
@@ -164,10 +165,9 @@ function SignIn({ person, onBack }: { person: Person; onBack: () => void }) {
             className="code-input"
             value={code}
             onChange={(e) => {
-              setCode(e.target.value.toUpperCase())
+              setCode(cleanInviteCode(e.target.value))
               setCodeError(false)
             }}
-            maxLength={6}
             autoCapitalize="characters"
             autoComplete="off"
             autoFocus

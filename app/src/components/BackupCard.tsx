@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CloudOff, CloudUpload, RefreshCw } from 'lucide-react'
+import { CloudOff, CloudUpload, KeyRound, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { AccountFailure, createOwnerAccount, signInReplacingPhone } from '../account'
+import { AccountFailure, createOwnerAccount, joinReplacingPhone, signInReplacingPhone } from '../account'
 import type { AccountError } from '../account'
+import { cleanInviteCode } from '../db'
 import { useI18n } from '../i18n'
 import { useSession } from '../session'
 import { backupAvailable } from '../supabase'
@@ -17,8 +18,11 @@ export function usePendingCount(): number {
   return useLiveQuery(countPending) ?? 0
 }
 
-/** On the More screen: whether this phone is backed up, and the way to set that up. */
-export function BackupCard() {
+/**
+ * On the More screen: whether this phone is backed up, and the way to set that up.
+ * `showJoin` adds the way for someone with no account to join a shop with an invite code.
+ */
+export function BackupCard({ showJoin = true }: { showJoin?: boolean }) {
   const { t } = useI18n()
   const { person, isAdmin } = useSession()
   const sync = useSyncState()
@@ -31,6 +35,8 @@ export function BackupCard() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<AccountError | null>(null)
   const [working, setWorking] = useState(false)
+  const [joining, setJoining] = useState(false)
+  const [code, setCode] = useState('')
 
   if (!backupAvailable || !person) return null
 
@@ -56,6 +62,22 @@ export function BackupCard() {
     }
   }
 
+  const join = async (e: FormEvent) => {
+    e.preventDefault()
+    if (working || code.length < 6) return
+    if (!window.confirm(t('account.joinWarn'))) return
+    setWorking(true)
+    setError(null)
+    try {
+      // Clears this phone's records and reloads the app with the shop's own.
+      await joinReplacingPhone(code)
+    } catch (failure) {
+      setError(failure instanceof AccountFailure ? failure.key : 'err.other')
+    } finally {
+      setWorking(false)
+    }
+  }
+
   if (!sync.signedIn) {
     return (
       <section className="card">
@@ -68,6 +90,47 @@ export function BackupCard() {
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
             <CloudUpload size={22} aria-hidden /> {t('backup.create')} / {t('account.signIn')}
           </button>
+        )}
+        {showJoin && (
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => {
+              setJoining(true)
+              setError(null)
+            }}
+          >
+            <KeyRound size={18} aria-hidden /> {t('account.noAccountJoin')}
+          </button>
+        )}
+
+        {joining && (
+          <Sheet title={t('account.joinTitle')} onClose={() => setJoining(false)}>
+            <form onSubmit={join}>
+              <label className="field">
+                <span>{t('account.joinHint')}</span>
+                <input
+                  className="code-input"
+                  value={code}
+                  onChange={(e) => {
+                    setCode(cleanInviteCode(e.target.value))
+                    setError(null)
+                  }}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  autoFocus
+                />
+              </label>
+              {error && (
+                <p className="field-error" role="alert">
+                  {t(error)}
+                </p>
+              )}
+              <button type="submit" className="btn btn-primary" disabled={working || code.length < 6}>
+                {t('account.joinBtn')}
+              </button>
+            </form>
+          </Sheet>
         )}
 
         {creating && (
@@ -91,7 +154,14 @@ export function BackupCard() {
             <form onSubmit={create}>
               <label className="field">
                 <span>{t('backup.email')}</span>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus required />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoFocus
+                  required
+                />
               </label>
               <label className="field">
                 <span>{t('backup.password')}</span>

@@ -5,6 +5,7 @@ import { AccountFailure, joinWithCode, signInOwner } from '../account'
 import type { AccountError } from '../account'
 import { BusinessFields } from '../components/BusinessFields'
 import { PinPad } from '../components/PinPad'
+import { cleanInviteCode } from '../db'
 import type { BusinessType } from '../db'
 import { createOwnerWithBusiness } from '../directory'
 import { useI18n } from '../i18n'
@@ -151,8 +152,7 @@ export function Onboarding() {
             <input
               className="code-input"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={6}
+              onChange={(e) => setCode(cleanInviteCode(e.target.value))}
               autoCapitalize="characters"
               autoComplete="off"
               autoFocus

@@ -344,6 +344,9 @@ export function newId(): string {
 // Letters and digits that are hard to confuse when read aloud or copied (no 0/O, 1/I/L).
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 
+/** What a person typed or pasted as an invite code, made comparable: capitals, no spaces or dashes. */
+export const cleanInviteCode = (typed: string) => typed.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+
 export function newInviteCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6))
   return Array.from(bytes, (x) => CODE_ALPHABET[x % CODE_ALPHABET.length]).join('')

@@ -1,12 +1,15 @@
 import { Plus, Users } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { BackupCard } from '../components/BackupCard'
 import { EmptyState } from '../components/EmptyState'
 import { Sheet } from '../components/Sheet'
-import type { Membership, Person } from '../db'
+import type { Membership, Person, Synced } from '../db'
 import { addWorker, removeWorker, renewInvite } from '../directory'
 import { useI18n } from '../i18n'
 import { useSession } from '../session'
+import { backupAvailable } from '../supabase'
+import { useSyncState } from '../sync'
 
 type WorkerRow = { membership: Membership; person: Person; shopName: string }
 
@@ -20,12 +23,15 @@ export function WorkersScreen() {
   const [phone, setPhone] = useState('')
   const [shopId, setShopId] = useState('')
   const [saving, setSaving] = useState(false)
+  const { signedIn } = useSyncState()
 
   if (!person) return null
 
   // The shops this owner manages. In a single-shop view only that shop is shown.
   const ownedIds = new Set(
-    dir.memberships.filter((m) => m.personId === person.id && m.role === 'admin' && !m.removedAt).map((m) => m.businessId),
+    dir.memberships
+      .filter((m) => m.personId === person.id && m.role === 'admin' && !m.removedAt)
+      .map((m) => m.businessId),
   )
   const shops = dir.businesses.filter((b) => ownedIds.has(b.id) && (!business || b.id === business.id))
   const targetShopId = shops.some((s) => s.id === shopId) ? shopId : (shops[0]?.id ?? '')
@@ -88,6 +94,13 @@ export function WorkersScreen() {
                   <span className="invite-label">{t('workers.code')}</span>
                   <span className="invite-code">{w.membership.inviteCode}</span>
                   <p>{t('workers.codeHelp', { name: w.person.name })}</p>
+                  {/* A code reaches other phones only through the backup, so say when it cannot yet. */}
+                  {backupAvailable && !signedIn && (
+                    <p className="warn-note">{t('workers.codeLocalOnly', { name: w.person.name })}</p>
+                  )}
+                  {signedIn && (w.membership as Synced<Membership>).dirty === 1 && (
+                    <p className="warn-note">{t('workers.codeSending', { name: w.person.name })}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -98,6 +111,8 @@ export function WorkersScreen() {
       <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
         <Plus size={22} aria-hidden /> {t('workers.add')}
       </button>
+
+      {!signedIn && workers.some((w) => w.membership.inviteCode) && <BackupCard showJoin={false} />}
 
       {adding && (
         <Sheet title={t('workers.add')} onClose={() => setAdding(false)}>
@@ -144,7 +159,10 @@ export function WorkersScreen() {
       {removing && (
         <Sheet title={t('workers.removeTitle')} onClose={() => setRemoving(null)}>
           <p className="sheet-text">
-            {t('workers.removeConfirm', { name: removing.person.name, shop: removing.shopName })}
+            {t('workers.removeConfirm', {
+              name: removing.person.name,
+              shop: removing.shopName,
+            })}
           </p>
           <button
             type="button"

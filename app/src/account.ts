@@ -1,4 +1,4 @@
-import { db } from './db'
+import { cleanInviteCode, db } from './db'
 import type { WordKey } from './i18n'
 import { supabase } from './supabase'
 import { countPending, setDevicePerson, syncNow } from './sync'
@@ -112,13 +112,30 @@ export async function signInReplacingPhone(email: string, password: string): Pro
   window.location.assign('/')
 }
 
-/** A worker links their own phone to the shop with the owner's invite code. */
-export async function joinWithCode(code: string): Promise<void> {
+/** Uses up the invite code on the server and signs this phone in as that worker. Returns their person id. */
+async function joinAndSignIn(code: string): Promise<string> {
   // The phone invents the password; the worker never needs to know it.
   const bytes = crypto.getRandomValues(new Uint8Array(24))
   const password = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-  const result = await callAuthFunction({ action: 'join', code: code.trim().toUpperCase(), password })
+  const result = await callAuthFunction({ action: 'join', code: cleanInviteCode(code), password })
   await signIn(String(result.email), password)
-  setDevicePerson(String(result.personId))
+  return String(result.personId)
+}
+
+/** A worker links their own phone to the shop with the owner's invite code. */
+export async function joinWithCode(code: string): Promise<void> {
+  setDevicePerson(await joinAndSignIn(code))
   await syncNow()
+}
+
+/**
+ * Someone with no account, on a phone that already holds records, joins a shop with an invite
+ * code. The phone's records are replaced by the shop's. Nothing is touched if the code is wrong.
+ */
+export async function joinReplacingPhone(code: string): Promise<void> {
+  const personId = await joinAndSignIn(code)
+  await wipePhone(true)
+  setDevicePerson(personId)
+  await syncNow()
+  window.location.assign('/')
 }
