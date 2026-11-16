@@ -35,17 +35,49 @@ function saveTries(personId: string, tries: Tries | null) {
   }
 }
 
+const WORKER_LOGIN = '@workers.chapakazi.invalid'
+
+/**
+ * Whether this phone's own login belongs to this person: they then choose a PIN without any
+ * invite code. That is the person the phone signed in as (owner) or joined as (worker). On an
+ * owner's phone whose sign-in did not record who they are, the owner still counts.
+ */
+function useOwnsThisPhone() {
+  const { devicePersonId, signedIn, email } = useSyncState()
+  const workerPhone = !!email?.endsWith(WORKER_LOGIN)
+  return {
+    workerPhone,
+    owns: (personId: string, isOwner: boolean) =>
+      devicePersonId === personId || (!devicePersonId && signedIn && !workerPhone && isOwner),
+  }
+}
+
 /** Shown whenever nobody is signed in: pick your name, then enter your PIN. */
 export function LockScreen() {
   const { t } = useI18n()
   const { dir } = useSession()
-  const { devicePersonId } = useSyncState()
+  const { workerPhone, owns } = useOwnsThisPhone()
   const [chosen, setChosen] = useState<Person | null>(null)
 
-  const people = dir.people
-    .map((person) => ({ person, views: viewsFor(person.id, dir) }))
+  const all = dir.people
+    .map((person) => {
+      const views = viewsFor(person.id, dir)
+      const isOwner = views.some((v) => v.role === 'admin')
+      const invited = dir.memberships.some((m) => m.personId === person.id && !m.removedAt && m.inviteCode !== undefined)
+      return { person, views, isOwner, invited, own: owns(person.id, isOwner) }
+    })
     .filter((p) => p.views.length > 0)
     .sort((a, b) => a.person.createdAt - b.person.createdAt)
+
+  // Only people who can really sign in on THIS phone:
+  // - a worker's own phone shows just that worker (never the owner or other workers);
+  // - otherwise, people with a PIN here, the phone's own person, and workers whose invite code
+  //   is still unused (a shared shop phone). Owners are never asked for an invite code, and
+  //   someone who already joined on their own phone is not listed as "new" here.
+  const canSignInHere = (p: (typeof all)[number]) => !!p.person.pinHash || p.own || (p.invited && !p.isOwner)
+  const mine = all.filter((p) => p.own)
+  // An owner with no PIN on this phone is never listed for someone else to claim.
+  const people = workerPhone && mine.length > 0 ? mine : all.filter(canSignInHere)
 
   if (chosen) {
     // Read the person fresh so a PIN saved a moment ago is seen.
@@ -64,8 +96,7 @@ export function LockScreen() {
       <div className="gate-body">
         <h1 className="screen-title">{t('lock.title')}</h1>
         <div className="list">
-          {people.map(({ person, views }) => {
-            const isOwner = views.some((v) => v.role === 'admin')
+          {people.map(({ person, views, isOwner, own }) => {
             const shop = dir.businesses.find((b) => b.id === views[0].businessId)?.name
             return (
               <button key={person.id} type="button" className="list-row" onClick={() => setChosen(person)}>
@@ -77,7 +108,7 @@ export function LockScreen() {
                   <span className="list-sub">
                     {person.pinHash
                       ? `${isOwner ? t('role.owner') : t('role.worker')}${!isOwner && shop ? ` · ${shop}` : ''}`
-                      : person.id === devicePersonId
+                      : own
                         ? t('lock.choosePin')
                         : t('lock.newWorker')}
                   </span>
@@ -94,10 +125,13 @@ export function LockScreen() {
 
 function SignIn({ person, onBack }: { person: Person; onBack: () => void }) {
   const { t } = useI18n()
-  const { login } = useSession()
+  const { login, dir } = useSession()
   const needsFirstPin = !person.pinHash
-  // The owner signing in on a new phone, or a worker who joined on their own phone.
-  const ownsThisPhone = useSyncState().devicePersonId === person.id
+  // The owner signing in on a new phone, or a worker who joined on their own phone: no code.
+  // Owners are only listed here when the phone is theirs or they have a PIN on it, so an owner
+  // is never asked for an invite code.
+  const isOwner = viewsFor(person.id, dir).some((v) => v.role === 'admin')
+  const ownsThisPhone = useOwnsThisPhone().owns(person.id, isOwner)
 
   // New worker: invite code, then choose a PIN twice.
   const [code, setCode] = useState('')
