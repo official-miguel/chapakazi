@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { adminDemo } from './subscription/admin'
 import { useSyncState } from './sync'
 
 // The platform admin: the person who runs Chapa Biz (not a shop owner). They can see which
@@ -135,10 +136,11 @@ export async function saveDarajaKeys(env: DarajaEnv, key: string, secret: string
 /** True if the signed-in login is a platform admin. Asked from the server once per sign-in. */
 export function usePlatformAdmin(): boolean {
   const { signedIn, email } = useSyncState()
-  const [admin, setAdmin] = useState(false)
+  const [admin, setAdmin] = useState(adminDemo)
 
   useEffect(() => {
     let current = true
+    if (adminDemo()) return
     if (!supabase || !signedIn) {
       setAdmin(false)
       return

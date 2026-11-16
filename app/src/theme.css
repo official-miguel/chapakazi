@@ -1682,6 +1682,141 @@ a.btn {
 }
 
 /* Platform admin */
+.segmented-5 {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.segmented-5 .segment {
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.admin-parts {
+  margin: 4px 0 12px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  margin-bottom: 10px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  color: var(--text-dim);
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-row .list-sub .tag {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.switch-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.switch {
+  position: relative;
+  width: 56px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 2px solid var(--line);
+  transition: background 0.15s;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+
+.switch-on {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.switch-on .switch-knob {
+  transform: translateX(24px);
+}
+
+.switch-label {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pay-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.pay-right {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  flex: none;
+}
+
+.pay-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.pay-detail p {
+  margin: 0 0 6px;
+}
+
+.pay-detail pre {
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.price-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.price-pair .field {
+  margin-bottom: 8px;
+}
+
 .segmented-3 {
   grid-template-columns: repeat(3, 1fr);
   margin: 12px 0;
@@ -1871,4 +2006,303 @@ a.btn {
   margin-top: 16px;
   color: var(--green-ink);
   font-size: 14px;
+}
+
+/* ---- Plan & payment ------------------------------------------------------------------- */
+.plan-locked .content {
+  padding-top: 16px;
+  padding-bottom: 40px;
+}
+
+.plan-now {
+  background: #ecfdf3;
+}
+
+.plan-now-over {
+  background: #fef2f2;
+}
+
+.plan-now-label {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.plan-now-name {
+  margin: 2px 0;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.plan-now-shops {
+  color: var(--text-dim);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.plan-now-date {
+  margin: 0;
+  font-size: 16px;
+}
+
+.plan-warn {
+  margin-top: 0;
+}
+
+.plan-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 12px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.plan-dot {
+  width: 28px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.plan-dot-on {
+  background: var(--green);
+}
+
+.plan-steps span:last-child {
+  margin-left: 6px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.stepper-btn {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--line);
+}
+
+.stepper-btn:disabled {
+  opacity: 0.35;
+}
+
+.stepper-value {
+  min-width: 64px;
+  font-size: 44px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.plan-badge-row {
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.plan-h2 {
+  margin-top: 4px;
+}
+
+.period-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.period-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  width: 100%;
+  padding: 18px 16px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  text-align: left;
+}
+
+.period-card:active {
+  transform: scale(0.99);
+}
+
+.period-best {
+  border-color: var(--green);
+  background: #ecfdf3;
+}
+
+.period-ribbon {
+  position: absolute;
+  top: -11px;
+  right: 14px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.period-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.period-price {
+  font-size: 21px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.period-per {
+  grid-column: 2;
+  color: var(--text-dim);
+  font-size: 14px;
+  text-align: right;
+}
+
+.period-save {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--green-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.plan-summary {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.plan-summary th {
+  text-align: left;
+}
+
+.plan-summary td {
+  text-align: right;
+}
+
+.plan-total th,
+.plan-total td {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.plan-phone {
+  margin-top: 12px;
+}
+
+.btn-pay {
+  font-size: 18px;
+}
+
+.plan-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--surface-2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: plan-spin 0.9s linear infinite;
+}
+
+.spinner-big {
+  width: 56px;
+  height: 56px;
+  border-width: 5px;
+}
+
+@keyframes plan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.plan-wait,
+.plan-result {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.plan-wait-title {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.plan-result-icon {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+}
+
+.plan-ok .plan-result-icon {
+  background: var(--green);
+  color: #000;
+}
+
+.plan-bad .plan-result-icon {
+  background: #fde2e1;
+  color: var(--red);
+}
+
+.plan-result .btn {
+  width: 100%;
+}
+
+.plan-lock-card {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fef3c7;
+  color: #7c3a06;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
 }

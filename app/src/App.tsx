@@ -20,19 +20,30 @@ import { DebtsScreen } from './screens/DebtsScreen'
 import { StockScreen } from './screens/StockScreen'
 import { SuppliersScreen } from './screens/SuppliersScreen'
 import { PlatformScreen } from './screens/PlatformScreen'
+import { PlanScreen } from './screens/PlanScreen'
 import { WorkersScreen } from './screens/WorkersScreen'
 import { usePlatformAdmin } from './platform'
 import { SessionProvider, useSession } from './session'
-import { startSync } from './sync'
+import { demoOn } from './subscription/demo'
+import { usePlan } from './subscription/api'
+import { startSync, useSyncState } from './sync'
 import { ToastProvider } from './toast'
 
 /** Decides what the person sees: first-time setup, the lock screen, or the app itself. */
 function Gate() {
-  const { dir, person, isAdmin } = useSession()
+  const { dir, person, isAdmin, views, business } = useSession()
   const platformAdmin = usePlatformAdmin()
+  const sync = useSyncState()
+  // The plan is checked only for phones with an account (a phone with no account has nothing
+  // on the server to pay for yet). Whoever runs Chapa Biz is never locked out.
+  const planChecked = !!person && (sync.signedIn || demoOn()) && !platformAdmin
+  const isOwner = views.some((v) => v.role === 'admin')
+  const plan = usePlan(isOwner ? null : (business?.id ?? null), planChecked)
 
   if (dir.people.length === 0) return <Onboarding />
   if (!person) return <LockScreen />
+  // Time has run out: only the payment screen opens, for the owner and their workers.
+  if (planChecked && plan.locked) return <PlanScreen locked />
 
   return (
     <Routes>
@@ -43,6 +54,7 @@ function Gate() {
         <Route path="debts" element={<DebtsScreen />} />
         <Route path="debts/:customerId" element={<CustomerScreen />} />
         <Route path="more" element={<MoreScreen />} />
+        {isAdmin && <Route path="plan" element={<PlanScreen />} />}
         <Route path="cash-count" element={<CashCountScreen />} />
         <Route path="inbox" element={<InboxScreen />} />
         {/* Owner-only pages do not exist at all in the worker view. */}

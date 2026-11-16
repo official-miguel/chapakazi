@@ -1,6 +1,6 @@
 import { BookOpen, Check, ChevronDown, CloudUpload, Home, Lock, Menu, Mic, Package, Users, WifiOff } from 'lucide-react'
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useI18n } from '../i18n'
 import type { WordKey } from '../i18n'
 import { useSession } from '../session'
@@ -8,6 +8,7 @@ import type { View } from '../session'
 import { useSyncState } from '../sync'
 import { useOnline } from '../useOnline'
 import { usePendingCount } from './BackupCard'
+import { PlanBanner } from './PlanBanner'
 import { Sheet } from './Sheet'
 import { VoiceSheet } from './VoiceSheet'
 
@@ -27,6 +28,9 @@ export function Layout() {
   const [speaking, setSpeaking] = useState(false)
   const sync = useSyncState()
   const pending = usePendingCount()
+  // The payment and Super admin pages have their own buttons and switches; the mic would cover them.
+  const path = useLocation().pathname
+  const showMic = path !== '/plan' && path !== '/platform'
 
   if (!person || !view) return null
 
@@ -64,9 +68,11 @@ export function Layout() {
       </header>
 
       <main className="content">
+        <PlanBanner />
         <Outlet />
       </main>
 
+      {showMic && (
       <button
         type="button"
         className="mic"
@@ -75,6 +81,7 @@ export function Layout() {
       >
         <Mic size={30} aria-hidden />
       </button>
+      )}
 
       <nav className="bottombar">
         {tabs.map(({ to, label, icon: Icon }) => (

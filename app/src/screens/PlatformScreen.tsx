@@ -18,8 +18,11 @@ import {
 } from '../platform'
 import type { DarajaEnv, DarajaStatus, MpesaRequest, Overview } from '../platform'
 import { useTimeFormat } from '../useTimeFormat'
+import { PlansAdmin } from '../components/PlansAdmin'
+import { StkSettingsCard } from '../components/StkSettingsCard'
+import { adminDemo } from '../subscription/admin'
 
-type Tab = 'shops' | 'people' | 'mpesa' | 'settings'
+type Tab = 'shops' | 'people' | 'plans' | 'mpesa' | 'settings'
 
 /** Platform admin only: who is using Chapa Biz and how active they are. Activity only, no money. */
 export function PlatformScreen() {
@@ -47,6 +50,10 @@ export function PlatformScreen() {
     setLoading(true)
     setFailed(false)
     try {
+      if (adminDemo()) {
+        setData(demoOverview())
+        return
+      }
       setData(await loadOverview())
       setRequests(await loadMpesaRequests())
       setDaraja(await loadDarajaStatus())
@@ -106,6 +113,7 @@ export function PlatformScreen() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'shops', label: t('platform.shops') },
     { id: 'people', label: t('platform.people') },
+    { id: 'plans', label: t('admin.plans') },
     { id: 'mpesa', label: waiting > 0 ? `M-Pesa (${waiting})` : 'M-Pesa' },
     { id: 'settings', label: t('platform.settings') },
   ]
@@ -151,7 +159,7 @@ export function PlatformScreen() {
           </section>
           <p className="card-note platform-note">{t('platform.privacy')}</p>
 
-          <div className="segmented segmented-4" role="tablist">
+          <div className="segmented segmented-5" role="tablist">
             {tabs.map((x) => (
               <button
                 key={x.id}
@@ -224,6 +232,10 @@ export function PlatformScreen() {
               ))}
             </div>
           )}
+
+          {tab === 'plans' && <PlansAdmin />}
+
+          {tab === 'settings' && <StkSettingsCard />}
 
           {tab === 'mpesa' && (
             <div className="list">
@@ -394,4 +406,15 @@ export function PlatformScreen() {
       )}
     </>
   )
+}
+
+/** Practice mode (?adminDemo=1, development builds only): an empty overview so the tabs show. */
+function demoOverview(): Overview {
+  return {
+    generated_at: new Date().toISOString(),
+    totals: { shops: 7, shops_active_7d: 5, shops_new_7d: 1, people: 11, people_active_7d: 8, logins: 9, entries: 412, actions_24h: 37, actions_7d: 260 },
+    shops: [],
+    people: [],
+    gemini: { set: false },
+  }
 }

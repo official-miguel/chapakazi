@@ -1,4 +1,4 @@
-import { Banknote, ChartColumn, ChevronRight, FileText, Inbox, Lock, LogOut, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
+import { Banknote, ChartColumn, CreditCard, ChevronRight, FileText, Inbox, Lock, LogOut, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountFailure, signOutAccount } from '../account'
@@ -45,6 +45,18 @@ export function MoreScreen() {
           <ChevronRight size={22} aria-hidden />
         </Link>
       </div>
+
+      {isAdmin && (
+        <div className="list list-gap">
+          <Link to="/plan" className="list-row">
+            <CreditCard size={24} aria-hidden />
+            <span className="list-main">
+              <span className="list-title">{t('plan.title')}</span>
+            </span>
+            <ChevronRight size={22} aria-hidden />
+          </Link>
+        </div>
+      )}
 
       {isAdmin && (
         <div className="list list-gap">
