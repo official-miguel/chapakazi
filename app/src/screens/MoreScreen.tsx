@@ -1,15 +1,32 @@
 import { Banknote, ChartColumn, CreditCard, ChevronRight, FileText, Inbox, Lock, LogOut, ShieldCheck, Smartphone, Store, Truck, UserPlus } from 'lucide-react'
 import { useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AccountFailure, signOutAccount } from '../account'
 import type { AccountError } from '../account'
 import { BackupCard } from '../components/BackupCard'
 import { useSyncState } from '../sync'
 import { useI18n } from '../i18n'
-import type { Lang } from '../i18n'
+import type { Lang, WordKey } from '../i18n'
 import { usePlatformAdmin } from '../platform'
 import { useSession } from '../session'
 import { useOnline } from '../useOnline'
+
+type MenuLink = { to: string; label: WordKey; icon: LucideIcon; owner?: boolean; superAdmin?: boolean }
+
+// Everything the More menu can open. Owner-only pages are hidden from workers.
+const menu: MenuLink[] = [
+  { to: '/inbox', label: 'inbox.title', icon: Inbox },
+  { to: '/cash-count', label: 'cash.title', icon: Banknote },
+  { to: '/plan', label: 'plan.title', icon: CreditCard, owner: true },
+  { to: '/analysis', label: 'analysis.title', icon: ChartColumn, owner: true },
+  { to: '/health-report', label: 'health.title', icon: FileText, owner: true },
+  { to: '/suppliers', label: 'sup.title', icon: Truck, owner: true },
+  { to: '/mpesa', label: 'mpesa.title', icon: Smartphone, owner: true },
+  { to: '/businesses', label: 'more.businesses', icon: Store, owner: true },
+  { to: '/workers', label: 'more.workers', icon: UserPlus, owner: true },
+  { to: '/platform', label: 'platform.title', icon: ShieldCheck, superAdmin: true },
+]
 
 const languages: { code: Lang; name: string }[] = [
   { code: 'en', name: 'English' },
@@ -25,97 +42,27 @@ export function MoreScreen() {
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<AccountError | null>(null)
 
+  const links = menu
+    .filter((m) => (!m.owner || isAdmin) && (!m.superAdmin || platformAdmin))
+    .map((m) => ({ ...m, label: t(m.label) }))
+    .sort((a, b) => a.label.localeCompare(b.label, lang === 'sw' ? 'sw' : 'en', { sensitivity: 'base' }))
+
   return (
     <>
       <h1 className="screen-title">{t('nav.more')}</h1>
 
+      {/* One list, in alphabetical order of the words shown (so it re-sorts in Swahili). */}
       <div className="list list-gap">
-        <Link to="/inbox" className="list-row">
-          <Inbox size={24} aria-hidden />
-          <span className="list-main">
-            <span className="list-title">{t('inbox.title')}</span>
-          </span>
-          <ChevronRight size={22} aria-hidden />
-        </Link>
-        <Link to="/cash-count" className="list-row">
-          <Banknote size={24} aria-hidden />
-          <span className="list-main">
-            <span className="list-title">{t('cash.title')}</span>
-          </span>
-          <ChevronRight size={22} aria-hidden />
-        </Link>
+        {links.map(({ to, label, icon: Icon }) => (
+          <Link key={to} to={to} className="list-row">
+            <Icon size={24} aria-hidden />
+            <span className="list-main">
+              <span className="list-title">{label}</span>
+            </span>
+            <ChevronRight size={22} aria-hidden />
+          </Link>
+        ))}
       </div>
-
-      {isAdmin && (
-        <div className="list list-gap">
-          <Link to="/plan" className="list-row">
-            <CreditCard size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('plan.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-        </div>
-      )}
-
-      {isAdmin && (
-        <div className="list list-gap">
-          <Link to="/analysis" className="list-row">
-            <ChartColumn size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('analysis.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-          <Link to="/health-report" className="list-row">
-            <FileText size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('health.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-          <Link to="/suppliers" className="list-row">
-            <Truck size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('sup.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-          <Link to="/mpesa" className="list-row">
-            <Smartphone size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('mpesa.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-          <Link to="/businesses" className="list-row">
-            <Store size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('more.businesses')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-          <Link to="/workers" className="list-row">
-            <UserPlus size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('more.workers')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-        </div>
-      )}
-
-      {platformAdmin && (
-        <div className="list list-gap">
-          <Link to="/platform" className="list-row">
-            <ShieldCheck size={24} aria-hidden />
-            <span className="list-main">
-              <span className="list-title">{t('platform.title')}</span>
-            </span>
-            <ChevronRight size={22} aria-hidden />
-          </Link>
-        </div>
-      )}
 
       <BackupCard />
 
