@@ -93,7 +93,11 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
     [
       t(kindLabel[d.kind]),
       d.customer?.name ?? (d.newCustomerName ? `${d.newCustomerName} (${t('voice.newCustomer')})` : null),
-      ...d.lines.map((l) => `${formatQty(l.qty)} ${unitName(t, l.item.unit)} ${l.item.name}`),
+      ...d.lines.map(
+        (l) =>
+          `${formatQty(l.qty)} ${unitName(t, l.item.unit)} ${l.item.name}` +
+          (l.unitPriceCents !== undefined ? ` × ${formatKsh(l.unitPriceCents)}` : ''),
+      ),
       d.kind === 'expense' ? t(categoryLabel(d.category)) : null,
       d.note ?? null,
       d.amountCents ? formatKsh(d.amountCents) : null,
@@ -138,7 +142,7 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
       name: l.item.name,
       unit: l.item.unit,
       qty: l.qty,
-      unitPriceCents: l.item.priceCents,
+      unitPriceCents: l.unitPriceCents ?? l.item.priceCents,
       totalCents: l.totalCents,
     }))
 

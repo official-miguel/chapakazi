@@ -9,11 +9,19 @@ import { isNumberWord, readNumber } from './numbers'
 //   "nimelipa stima mia tano mpesa"     -> expense, electricity, KSh 500, M-Pesa
 //   "Mary amechukua mkate kwa deni soo" -> credit to Mary, Bread, KSh 100
 //   "Mary amelipa deni mia mbili"       -> debt payment from Mary, KSh 200
+//   "6 pieces of bread at 300"          -> sale, 6 Bread at KSh 300 each = KSh 1,800
+//   "mkate sita mia tatu kila moja"     -> the same, in Swahili
 //
 // `sure` is false when something is missing or left unexplained. The caller then asks the
 // person to check, instead of guessing.
 
-export type VoiceLine = { item: Item; qty: number; totalCents: number }
+export type VoiceLine = {
+  item: Item
+  qty: number
+  totalCents: number
+  /** The price of one, when it was said ("at 300", "kila moja"). */
+  unitPriceCents?: number
+}
 
 export type VoiceDraft = {
   heard: string
@@ -44,7 +52,7 @@ export const EXPENSE = words('expense expenses matumizi nimelipa tumelipa nimetu
 export const SALE = words('sale sales sold nimeuza ameuza tumeuza mauzo uza')
 const MONEY = words('shillings shilling shilingi bob ksh kes sh')
 const FILLER = words(
-  'na ya wa kwa za la ni the a an of for to and at on in is ile hii hiyo amechukua amenunua alichukua took bought buys from kutoka',
+  'na ya wa kwa za la cha vya ni the a an of for to and at on in is ile hii hiyo amechukua amenunua alichukua took bought buys from kutoka',
 )
 
 const CATEGORY: [ExpenseCategory, Set<string>][] = [
@@ -55,6 +63,16 @@ const CATEGORY: [ExpenseCategory, Set<string>][] = [
   ['wages', words('wages wage salary mshahara mishahara')],
   ['stock', words('stock stoki restock bidhaa supplier')],
 ]
+
+/**
+ * Words that make the number beside them the price of ONE: "at 300", "300 each",
+ * "300 per piece", "mia tatu kila moja". The total is then quantity x that price.
+ */
+const EACH = words('each apiece per kila')
+/** Words that can follow "kila" / "each" / "per" and belong to it: "kila moja", "per piece". */
+const EACH_ONE = words('moja kimoja mmoja one kipande')
+/** Small words allowed between a quantity and its item: "6 pieces OF bread", "kilo mbili ZA sukari". */
+const LINK = words('of ya za la wa cha vya')
 
 /** Things sold whole. For these a spoken amount is a price, not a part of one. */
 const COUNTED = words('pcs pkts crates bunches cups')
@@ -96,6 +114,9 @@ export function normalise(text: string): string[] {
     .toLowerCase()
     .replace(/m[\s-]*pesa/g, 'mpesa')
     .replace(/ksh\.?\s*(?=\d)/g, 'ksh ')
+    .replace(/@/g, ' at ')
+    // "6pieces", "300bob" -> "6 pieces", "300 bob" (but "2k" stays a number)
+    .replace(/(\d)(?=\p{L}{2,})/gu, '$1 ')
     .replace(/(\d),(?=\d{3})/g, '$1')
     .replace(/[^\p{L}\p{N}.\s]/gu, ' ')
     .replace(/\.(?!\d)/g, ' ')
@@ -233,8 +254,34 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
   // Items only belong on sales and credit.
   if (kind !== 'sale' && kind !== 'credit') spans.length = 0
 
+  // --- "each" words: they mark a price of one ("at" is checked beside its number)
+  const eachStarts = new Set<number>()
+  const eachEnds = new Set<number>()
+  for (let i = 0; i < said.length; i++) {
+    if (taken[i] || !EACH.has(said[i])) continue
+    let end = i + 1
+    if (EACH_ONE.has(said[end] ?? '') || UNIT_WORDS.has(said[end] ?? '')) end++
+    take(i, end)
+    eachStarts.add(i)
+    eachEnds.add(end)
+  }
+  const priceOfOne = (start: number, end: number) => {
+    const before = MONEY.has(said[start - 1] ?? '') ? start - 1 : start
+    const after = MONEY.has(said[end] ?? '') ? end + 1 : end
+    return said[before - 1] === 'at' || eachEnds.has(before) || eachStarts.has(after)
+  }
+
   // --- every number that was said, and what sits next to it
-  type Num = { start: number; end: number; value: number; used: boolean; money: boolean; unit: string | undefined }
+  type Num = {
+    start: number
+    end: number
+    value: number
+    used: boolean
+    money: boolean
+    /** The price of one, not a total. */
+    each: boolean
+    unit: string | undefined
+  }
   const numbers: Num[] = []
   for (let i = 0; i < said.length; ) {
     const n = taken[i] ? null : readNumber(said, i)
@@ -247,6 +294,7 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
       end: n.end,
       value: n.value,
       used: false,
+      each: priceOfOne(i, n.end),
       money: MONEY.has(said[n.end] ?? '') || MONEY.has(said[i - 1] ?? ''),
       unit: UNIT_OF[said[n.end] ?? ''] ?? UNIT_OF[said[i - 1] ?? ''],
     })
@@ -260,16 +308,30 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
   let quantitySaid = false
   takeAll(UNIT_WORDS)
 
-  for (const { item, start, end } of spans) {
+  // A price of one belongs to the item said just before it (or the first item, if it came first).
+  const eachOf = new Map<number, Num>()
+  for (const n of numbers.filter((n) => n.each)) {
+    const owner = spans.reduce((found, s, k) => (s.start < n.start ? k : found), spans.length > 0 ? 0 : -1)
+    if (owner >= 0 && !eachOf.has(owner)) eachOf.set(owner, n)
+  }
+  // Between a number and its item: nothing, one word ("kilo"), or a unit and a link ("pieces of").
+  const near = (from: number, to: number) => {
+    if (from > to) return false
+    if (to - from <= 1) return true
+    return to - from === 2 && said.slice(from, to).every((w) => UNIT_WORDS.has(w) || LINK.has(w))
+  }
+
+  spans.forEach(({ item, start, end }, k) => {
+    const each = eachOf.get(k)
     // The quantity is a number right beside the item, with at most a unit word or "ya" between.
     const fits = (n: Num) => n.unit === undefined || n.unit === item.unit || !(item.unit in KNOWN_UNITS)
-    const beside = numbers.filter(
-      (n) => !n.used && !n.money && fits(n) && (start - n.end <= 1 && n.end <= start ? true : n.start - end <= 1 && n.start >= end),
-    )
-    const byAmount = beside.find((n) => n.start >= end && said[n.start - 1] === 'ya') // "sukari ya hamsini"
+    const beside = numbers.filter((n) => !n.used && !n.money && !n.each && fits(n) && (near(n.end, start) || near(end, n.start)))
+    const byAmount = each ? undefined : beside.find((n) => n.start >= end && said[n.start - 1] === 'ya') // "sukari ya hamsini"
     const others = numbers.filter((n) => !n.used).length
     const qtyNumber =
       beside.find((n) => n.unit && n !== byAmount) ??
+      // With a price of one said, any number beside the item is how many ("mkate thelathini at 50").
+      (each ? beside[0] : undefined) ??
       // A small bare number is a count ("mkate mbili") if some other number can be the money.
       beside.find((n) => n !== byAmount && n.value < 20 && (others > 1 || item.priceCents !== undefined))
 
@@ -280,6 +342,13 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
       qty = qtyNumber.value
       quantitySaid = true
     }
+    if (each) {
+      each.used = true
+      quantitySaid = true
+      const unitPriceCents = Math.round(each.value * 100)
+      lines.push({ item, qty, totalCents: Math.round(qty * unitPriceCents), unitPriceCents })
+      return
+    }
     if (byAmount && item.priceCents) {
       byAmount.used = true
       quantitySaid = true
@@ -289,6 +358,21 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
       totalCents = Math.round(item.priceCents * qty)
     }
     lines.push({ item, qty, totalCents })
+  })
+
+  // A price of one with no known item: "6 pieces at 300" is still 6 x 300, and the 6 is kept in the note.
+  let pricedCents = 0
+  const pricedNotes: string[] = []
+  for (const each of numbers.filter((n) => n.each && !n.used)) {
+    const counts = numbers.filter((n) => !n.used && !n.money && !n.each)
+    const qtyNumber = [...counts].reverse().find((n) => n.end <= each.start) ?? counts.find((n) => n.start >= each.end)
+    if (!qtyNumber) continue // "at 300" alone is just the amount
+    qtyNumber.used = true
+    each.used = true
+    pricedCents += Math.round(qtyNumber.value * each.value * 100)
+    const after = said[qtyNumber.end] ?? ''
+    const unitWord = !qtyNumber.unit ? '' : UNIT_OF[after] ? after : said[qtyNumber.start - 1]
+    pricedNotes.push(`${qtyNumber.value}${unitWord ? ` ${unitWord}` : ''} × ${each.value}`)
   }
 
   // --- the amount: a number marked as money, else the biggest one left
@@ -301,7 +385,7 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
   // it did not recognise, so it is left unexplained rather than saved as money.
   if (amountNumber && !amountNumber.money && amountNumber.value < 5) amountNumber = undefined
   let amountCents: number | null = null
-  if (!amountNumber && linesTotal > 0) amountCents = linesTotal
+  if (!amountNumber && linesTotal + pricedCents > 0) amountCents = linesTotal + pricedCents
   if (amountNumber) {
     amountNumber.used = true
     amountCents = Math.round(amountNumber.value * 100)
@@ -324,7 +408,8 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
     newCustomerName = leftover.splice(0, Math.min(2, leftover.length)).map(capitalise).join(' ')
   }
 
-  const note = leftover.length > 0 && leftover.length <= 6 ? capitalise(leftover.join(' ')) : undefined
+  const saidNote = leftover.length > 0 && leftover.length <= 6 ? capitalise(leftover.join(' ')) : undefined
+  const note = [saidNote, ...pricedNotes].filter(Boolean).join(' · ') || undefined
   const unexplainedNumbers = numbers.some((n) => !n.used)
   const needsCustomer = kind === 'credit' || kind === 'payment'
   const sure =
@@ -343,7 +428,7 @@ export function understand(text: string, shop: ShopWords): VoiceDraft {
     lines,
     customer,
     newCustomerName,
-    note: lines.length > 0 && kind !== 'expense' ? undefined : note,
+    note: lines.length > 0 && kind !== 'expense' && pricedNotes.length === 0 ? undefined : note,
     unknown,
     sure,
   }
