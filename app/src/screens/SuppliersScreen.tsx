@@ -40,7 +40,9 @@ export function SuppliersScreen() {
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [shopId, setShopId] = useState(shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(shops[0]?.id ?? '')
+  // The list of shops can arrive after the screen opens: never stay on "no shop".
+  const shopId = shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'mpesa'>('cash')
   const [alsoExpense, setAlsoExpense] = useState(true)

@@ -15,7 +15,9 @@ export function CashCountScreen() {
   const toast = useToast()
   const { dir, person, shops } = useSession()
   const { dateTime } = useTimeFormat()
-  const [shopId, setShopId] = useState(shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(shops[0]?.id ?? '')
+  // The list of shops can arrive after the screen opens: never stay on "no shop".
+  const shopId = shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const [opening, setOpening] = useState<string | null>(null)
   const [counted, setCounted] = useState('')
   const [note, setNote] = useState('')

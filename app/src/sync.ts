@@ -2,6 +2,7 @@ import type { Table } from 'dexie'
 import { useSyncExternalStore } from 'react'
 import { db, onLocalChange, runAsServer } from './db'
 import { recomputeCustomers, recomputeEntries, recomputeItems } from './recompute'
+import { repairShoplessRecords } from './shopRepair'
 import { supabase } from './supabase'
 
 // Backup and sync.
@@ -180,10 +181,20 @@ async function applyRemote(spec: Spec, rows: RemoteRow[], touched: Touched): Pro
 
 async function pushTable(spec: Spec, touched: Touched): Promise<void> {
   if (!supabase) return
+  // Records the server refused this time. They stay waiting (and are retried next sync), but
+  // the rest are still sent. The first refusal is reported once the others are through.
+  const refused = new Set<string>()
+  let firstRefusal: unknown = null
   for (let round = 0; round < 50; round++) {
-    const rows = await spec.local.where('dirty').equals(1).limit(PAGE).toArray()
-    if (rows.length === 0) return
+    const rows = await spec.local
+      .where('dirty')
+      .equals(1)
+      .filter((r) => !refused.has(r.id))
+      .limit(PAGE)
+      .toArray()
+    if (rows.length === 0) break
     const payload = rows.map((r) => toRemote(spec, r))
+    let sentRows = rows
 
     if (spec.updateOnly) {
       // Phones never add these records, so each change is sent as a plain "change this one".
@@ -216,15 +227,37 @@ async function pushTable(spec: Spec, touched: Touched): Promise<void> {
       // to make this change, so a refusal here is expected and ignored.
       const seen = payload.filter((p) => (p.data as Row).seenAt)
       if (seen.length) await supabase.from(spec.remote).upsert(seen, { onConflict: 'id' })
-    } else if (spec.appendOnly) {
-      const { error } = await supabase.from(spec.remote).upsert(payload, { onConflict: 'id', ignoreDuplicates: true })
-      if (error) throw error
     } else {
-      const { data, error } = await supabase.from(spec.remote).upsert(payload, { onConflict: 'id' }).select('id, updated_at')
-      if (error) throw error
+      const send = async (part: typeof payload) =>
+        spec.appendOnly
+          ? await supabase!.from(spec.remote).upsert(part, { onConflict: 'id', ignoreDuplicates: true })
+          : await supabase!.from(spec.remote).upsert(part, { onConflict: 'id' }).select('id, updated_at')
+      let { data, error } = await send(payload)
+      if (error) {
+        // Something in this batch was refused: send them one by one to find which.
+        if (!navigator.onLine) throw error
+        const accepted: Record<string, unknown>[] = []
+        sentRows = []
+        for (const [i, one] of payload.entries()) {
+          const single = await send([one])
+          if (single.error) {
+            refused.add(one.id)
+            firstRefusal ??= single.error
+          } else {
+            sentRows.push(rows[i])
+            accepted.push(...((single.data ?? []) as Record<string, unknown>[]))
+          }
+        }
+        data = accepted as typeof data
+        error = null
+      }
       // If the server kept a later change from another phone, fetch it so this phone agrees.
       const sent = new Map(payload.map((p) => [p.id, p.updated_at]))
-      const lost = (data ?? []).filter((d) => num(d.updated_at) > (sent.get(d.id as string) ?? 0)).map((d) => d.id as string)
+      const lost = spec.appendOnly
+        ? []
+        : ((data ?? []) as Record<string, unknown>[])
+            .filter((d) => num(d.updated_at) > (sent.get(d.id as string) ?? 0))
+            .map((d) => d.id as string)
       if (lost.length) {
         const { data: winners } = await supabase.from(spec.remote).select('*').in('id', lost)
         await runAsServer(async () => {
@@ -236,7 +269,7 @@ async function pushTable(spec: Spec, touched: Touched): Promise<void> {
 
     // Clear the flag, unless the record changed again while it was being sent.
     await runAsServer(async () => {
-      for (const sentRow of rows) {
+      for (const sentRow of sentRows) {
         await spec.local
           .where('id')
           .equals(sentRow.id)
@@ -245,8 +278,9 @@ async function pushTable(spec: Spec, touched: Touched): Promise<void> {
           })
       }
     })
-    if (rows.length < PAGE) return
+    if (rows.length < PAGE) break
   }
+  if (firstRefusal) throw firstRefusal
 }
 
 /** Links this phone's login to its owner's person record, once. */
@@ -281,6 +315,7 @@ class Touched {
 
 async function pullTable(spec: Spec, touched: Touched): Promise<void> {
   if (!supabase) return
+  const startedIn = generation
   const saved = read(cursorKey(spec.remote))
   // Re-read the last few seconds each time: a record saved by another phone at the same moment
   // could otherwise be missed. Reading a record twice does no harm.
@@ -303,7 +338,28 @@ async function pullTable(spec: Spec, touched: Touched): Promise<void> {
     newest = last.synced_at
     if (rows.length < 500) break
   }
-  write(cursorKey(spec.remote), newest)
+  // If the phone was wiped meanwhile, what was read is gone: keep no bookmark, read it all again.
+  if (generation === startedIn) write(cursorKey(spec.remote), newest)
+}
+
+/**
+ * Shops this phone is a member of but does not hold (a bookmark can skip them, for example if
+ * the phone was wiped while a sync was running). They are fetched by id, and every shop's
+ * records are then read again from the start. Returns how many are still missing.
+ */
+async function fetchMissingShops(touched: Touched): Promise<number> {
+  if (!supabase) return 0
+  const have = new Set(await db.businesses.toCollection().primaryKeys())
+  const wanted = new Set((await db.memberships.toArray()).filter((m) => !m.removedAt).map((m) => m.businessId))
+  const missing = [...wanted].filter((id) => id && !have.has(id))
+  if (missing.length === 0) return 0
+  const { data, error } = await supabase.from('ck_businesses').select('*').in('id', missing)
+  if (error) throw error
+  const shopsSpec = specs.find((x) => x.remote === 'ck_businesses')!
+  await applyRemote(shopsSpec, (data ?? []) as RemoteRow[], touched)
+  for (const remote of SHOP_TABLES) write(cursorKey(remote), null)
+  write(SHOPS_KEY, null)
+  return missing.length - (data?.length ?? 0)
 }
 
 /** If this phone can now see a shop it could not see before, read that shop's records from the start. */
@@ -317,19 +373,21 @@ async function restartIfShopsChanged(): Promise<void> {
 
 async function recomputeTouched(touched: Touched): Promise<void> {
   if (touched.entries.size + touched.items.size + touched.customers.size === 0) return
-  await runAsServer(async () => {
-    const noteEntry = async (id: string) => {
-      const entry = await db.entries.get(id)
+  const noteEntries = async () => {
+    const entries = await db.entries.bulkGet([...touched.entries])
+    for (const entry of entries) {
       if (entry?.customerId) touched.customers.add(entry.customerId)
-      for (const line of entry?.lines ?? []) touched.items.add(line.itemId)
+      for (const line of entry?.lines ?? []) if (line.itemId) touched.items.add(line.itemId)
     }
-    // Items and customers are affected by what an entry said before and what it says now.
-    for (const id of touched.entries) await noteEntry(id)
-    await recomputeEntries(touched.entries)
-    for (const id of touched.entries) await noteEntry(id)
-    await recomputeItems(touched.items)
-    await recomputeCustomers(touched.customers)
-  })
+  }
+  // Items and customers are affected by what an entry said before and what it says now.
+  // Each step is its own short transaction: these totals are worked out again from the records
+  // every time, so a step that fails is simply redone on the next sync.
+  await noteEntries()
+  await runAsServer(() => recomputeEntries(touched.entries))
+  await noteEntries()
+  await runAsServer(() => recomputeItems(touched.items))
+  await runAsServer(() => recomputeCustomers(touched.customers))
 }
 
 // ---- running --------------------------------------------------------------------------------
@@ -345,6 +403,11 @@ function describeProblem(step: string, table: string, error: unknown): string {
 }
 
 let running = false
+/** Goes up when the phone is wiped, so a sync that started before cannot save stale bookmarks. */
+let generation = 0
+export function forgetSyncProgress(): void {
+  generation++
+}
 let again = false
 
 /** Sends this phone's changes, then fetches everyone else's. Safe to call at any time. */
@@ -365,6 +428,16 @@ export async function syncNow(): Promise<void> {
   const problems: string[] = []
   const touched = new Touched()
   try {
+    try {
+      const stillMissing = await fetchMissingShops(touched)
+      if (stillMissing > 0) problems.push(`shops: ${stillMissing} shop(s) could not be fetched`)
+      const repaired = await repairShoplessRecords(getDevicePerson())
+      if (repaired > 0) console.info(`[sync] gave ${repaired} record(s) back their shop`)
+    } catch (error) {
+      failed = true
+      problems.push(describeProblem('repair', '', error))
+      console.warn('[sync] repair failed', error)
+    }
     for (const spec of specs) {
       // One table failing (say, a record this login may not change) must not block the rest.
       try {
@@ -386,7 +459,13 @@ export async function syncNow(): Promise<void> {
         console.warn(`[sync] receiving ${spec.remote} failed`, error)
       }
     }
-    await recomputeTouched(touched)
+    try {
+      await recomputeTouched(touched)
+    } catch (error) {
+      failed = true
+      problems.push(describeProblem('totals', '', error))
+      console.warn('[sync] totals failed', error)
+    }
   } catch (error) {
     failed = true
     problems.push(describeProblem('sync', '', error))

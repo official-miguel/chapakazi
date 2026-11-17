@@ -1,7 +1,7 @@
 import { cleanInviteCode, db } from './db'
 import type { WordKey } from './i18n'
 import { supabase } from './supabase'
-import { countPending, setDevicePerson, syncNow } from './sync'
+import { countPending, forgetSyncProgress, setDevicePerson, syncNow } from './sync'
 
 // Accounts. An owner signs in with email and password. A worker has no email: their own phone
 // is linked to the shop with the invite code the owner gave them.
@@ -90,6 +90,7 @@ export async function signOutAccount(): Promise<void> {
 
 /** Empties this phone of records and of its own notes, keeping the chosen language (and the login if asked). */
 async function wipePhone(keepLogin: boolean): Promise<void> {
+  forgetSyncProgress()
   await Promise.all(db.tables.map((table) => table.clear()))
   try {
     for (const key of Object.keys(localStorage)) {

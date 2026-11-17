@@ -14,7 +14,9 @@ export function CustomerForm({ editing, onClose }: { editing?: Customer; onClose
   const [name, setName] = useState(editing?.name ?? '')
   const [phone, setPhone] = useState(editing?.phone ?? '')
   const [limit, setLimit] = useState(editing?.limitCents !== undefined ? String(editing.limitCents / 100) : '')
-  const [shopId, setShopId] = useState(editing?.businessId ?? shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(editing?.businessId ?? shops[0]?.id ?? '')
+  // The list of shops can arrive after the form opens: never stay on "no shop".
+  const shopId = editing ? editing.businessId : shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const [bad, setBad] = useState(false)
   const [saving, setSaving] = useState(false)
 

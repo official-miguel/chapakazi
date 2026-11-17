@@ -111,7 +111,13 @@ export function EntryForm({
   })
   const [category, setCategory] = useState<ExpenseCategory>(editing?.category ?? draft?.category ?? 'stock')
   const [note, setNote] = useState(editing?.note ?? draft?.note ?? '')
-  const [shopId, setShopId] = useState(editing?.businessId ?? forCustomer?.businessId ?? draft?.shopId ?? shops[0]?.id ?? '')
+  // In "All businesses" a new entry asks which shop it is for; nothing is chosen for them.
+  const askShop = !editing && !forCustomer && !fromMpesa && !draft?.shopId && shops.length > 1
+  const [pickedShop, setShopId] = useState(
+    editing?.businessId || forCustomer?.businessId || draft?.shopId || (askShop ? '' : (shops[0]?.id ?? '')),
+  )
+  // One shop in view: always that one, even if the list of shops arrived after the form opened.
+  const shopId = pickedShop || (shops.length === 1 ? shops[0].id : '')
   const [picked, setPicked] = useState<Customer | null>(forCustomer ?? draft?.customer ?? null)
   // When editing, the customer is fixed; they are looked up only to show their name.
   const editedCustomer = useLiveQuery(
@@ -189,7 +195,11 @@ export function EntryForm({
       setError('entry.customerNeeded')
       return
     }
-    if (amountCents === null || !shopId) {
+    if (!shopId) {
+      setError('entry.pickShop')
+      return
+    }
+    if (amountCents === null) {
       setError('entry.amountBad')
       return
     }
@@ -240,8 +250,8 @@ export function EntryForm({
     <Sheet title={title} onClose={onClose}>
       <form onSubmit={save}>
         {!editing && !forCustomer && !fromMpesa && shops.length > 1 && (
-          <div className="field">
-            <span>{t('entry.shop')}</span>
+          <div className={shopId ? 'field' : 'field shop-ask'}>
+            <span>{t('entry.whichShop')}</span>
             <div className="chips">
               {shops.map((s) => (
                 <button

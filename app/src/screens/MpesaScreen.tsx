@@ -35,7 +35,9 @@ export function MpesaScreen() {
   const toast = useToast()
   const { person, shops } = useSession()
   const sync = useSyncState()
-  const [shopId, setShopId] = useState(shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(shops[0]?.id ?? '')
+  // The list of shops can arrive after the screen opens: never stay on "no shop".
+  const shopId = shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const link = useLiveQuery(async () => (await db.mpesaLinks.where('businessId').equals(shopId).first()) ?? null, [shopId])
   const [editing, setEditing] = useState(false)
   const [kind, setKind] = useState<MpesaLink['kind']>('till')

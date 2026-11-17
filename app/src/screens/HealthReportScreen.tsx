@@ -22,7 +22,9 @@ const percent = (share: number) => `${Math.round(share * 100)}%`
 export function HealthReportScreen() {
   const { t, lang } = useI18n()
   const { dir, person, shops } = useSession()
-  const [shopId, setShopId] = useState(shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(shops[0]?.id ?? '')
+  // The list of shops can arrive after the screen opens: never stay on "no shop".
+  const shopId = shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const report = useLiveQuery(() => healthReport(shopId, Date.now()), [shopId])
   const shop = dir.businesses.find((b) => b.id === shopId)
 

@@ -37,7 +37,9 @@ export function ItemForm({
   const [tracked, setTracked] = useState(editing?.tracked ?? true)
   const [opening, setOpening] = useState('')
   const [lowAt, setLowAt] = useState(editing?.lowAt !== undefined ? String(editing.lowAt) : '')
-  const [shopId, setShopId] = useState(editing?.businessId ?? shops[0]?.id ?? '')
+  const [pickedShop, setShopId] = useState(editing?.businessId ?? shops[0]?.id ?? '')
+  // The list of shops can arrive after the form opens: never stay on "no shop".
+  const shopId = editing ? editing.businessId : shops.some((s) => s.id === pickedShop) ? pickedShop : (shops[0]?.id ?? '')
   const [supplierId, setSupplierId] = useState(editing?.supplierId ?? '')
   const [showError, setShowError] = useState(false)
   // Suppliers are the owner's business, so only the owner's form offers them.

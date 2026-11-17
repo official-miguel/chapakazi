@@ -2375,3 +2375,16 @@ a.btn {
   padding-left: 18px;
   overflow-wrap: anywhere;
 }
+
+/* "Which shop is this for?" while none is chosen yet (All businesses). */
+.shop-ask {
+  padding: 10px 12px;
+  border: 2px solid var(--green);
+  border-radius: 12px;
+  background: #ecfdf3;
+}
+
+.shop-ask > span {
+  color: var(--green-ink);
+  font-weight: 600;
+}

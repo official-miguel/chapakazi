@@ -60,7 +60,10 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
   const toast = useToast()
   const { dir, person, shops, ownsShop } = useSession()
   const { time } = useTimeFormat()
-  const [shopId, setShopId] = useState(shops[0]?.id ?? '')
+  // In "All businesses" the shop is chosen first: what is said is matched to that shop's items
+  // and customers. One shop in view: always that one.
+  const [pickedShop, setShopId] = useState(shops.length > 1 ? '' : (shops[0]?.id ?? ''))
+  const shopId = shops.some((s) => s.id === pickedShop) ? pickedShop : shops.length === 1 ? shops[0].id : ''
   const [phase, setPhase] = useState<'idle' | 'listening' | 'confirm' | 'fix'>('idle')
   const [live, setLive] = useState('')
   const [typed, setTyped] = useState('')
@@ -71,6 +74,7 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
   const speechLang = lang === 'sw' ? 'sw-KE' : 'en-KE'
 
   const shop = useLiveQuery(async () => {
+    if (!shopId) return null
     const today = startOfDay(Date.now())
     return {
       items: (await db.items.where('businessId').equals(shopId).toArray()).filter((i) => !i.archived),
@@ -297,8 +301,8 @@ export function VoiceSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title={t('voice.title')} onClose={onClose}>
       {shops.length > 1 && phase !== 'confirm' && (
-        <div className="field">
-          <span>{t('entry.shop')}</span>
+        <div className={shopId ? 'field' : 'field shop-ask'}>
+          <span>{t(shopId ? 'entry.whichShop' : 'voice.pickShopFirst')}</span>
           <div className="chips">
             {shops.map((s) => (
               <button

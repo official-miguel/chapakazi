@@ -409,8 +409,10 @@ export function onLocalChange(listener: () => void): () => void {
 // Every record saved or changed on this phone is flagged for backup automatically, so no screen
 // has to remember to do it. Records arriving from the server are not flagged (see runAsServer).
 for (const table of db.tables) {
-  table.hook('creating', (_key, record: { dirty?: number }, tx) => {
+  table.hook('creating', (_key, record: { dirty?: number; businessId?: unknown }, tx) => {
     if ((tx as MaybeRemote).fromServer) return
+    // A shop record with no shop would show in no ledger and be refused by the server.
+    if ('businessId' in record && !record.businessId) throw new Error('A record must belong to a shop')
     record.dirty = 1
     changeListeners.forEach((notify) => notify())
   })
