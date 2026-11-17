@@ -1,16 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CloudOff, CloudUpload, KeyRound, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import type { FormEvent } from 'react'
-import { AccountFailure, createOwnerAccount, joinReplacingPhone, signInReplacingPhone } from '../account'
-import type { AccountError } from '../account'
-import { cleanInviteCode } from '../db'
 import { useI18n } from '../i18n'
 import { useSession } from '../session'
 import { backupAvailable } from '../supabase'
 import { countPending, syncNow, useSyncState } from '../sync'
 import { useOnline } from '../useOnline'
 import { useTimeFormat } from '../useTimeFormat'
+import { JoinShopForm, OwnerAccountForm } from './AccountForms'
 import { Sheet } from './Sheet'
 
 /** How many records are waiting to be backed up. Updates as records are saved and sent. */
@@ -30,53 +27,9 @@ export function BackupCard({ showJoin = true }: { showJoin?: boolean }) {
   const online = useOnline()
   const { dateTime } = useTimeFormat()
   const [creating, setCreating] = useState(false)
-  const [mode, setMode] = useState<'create' | 'signin'>('create')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<AccountError | null>(null)
-  const [working, setWorking] = useState(false)
   const [joining, setJoining] = useState(false)
-  const [code, setCode] = useState('')
 
   if (!backupAvailable || !person) return null
-
-  const create = async (e: FormEvent) => {
-    e.preventDefault()
-    if (working) return
-    setWorking(true)
-    setError(null)
-    try {
-      if (mode === 'signin') {
-        if (!window.confirm(t('backup.signInWarn'))) return
-        // Clears this phone's records and reloads the app with the account's own.
-        await signInReplacingPhone(email, password)
-        return
-      }
-      await createOwnerAccount(email, password, person.id)
-      setCreating(false)
-      setPassword('')
-    } catch (failure) {
-      setError(failure instanceof AccountFailure ? failure.key : 'err.other')
-    } finally {
-      setWorking(false)
-    }
-  }
-
-  const join = async (e: FormEvent) => {
-    e.preventDefault()
-    if (working || code.length < 6) return
-    if (!window.confirm(t('account.joinWarn'))) return
-    setWorking(true)
-    setError(null)
-    try {
-      // Clears this phone's records and reloads the app with the shop's own.
-      await joinReplacingPhone(code)
-    } catch (failure) {
-      setError(failure instanceof AccountFailure ? failure.key : 'err.other')
-    } finally {
-      setWorking(false)
-    }
-  }
 
   if (!sync.signedIn) {
     return (
@@ -95,10 +48,7 @@ export function BackupCard({ showJoin = true }: { showJoin?: boolean }) {
           <button
             type="button"
             className="link-btn"
-            onClick={() => {
-              setJoining(true)
-              setError(null)
-            }}
+            onClick={() => setJoining(true)}
           >
             <KeyRound size={18} aria-hidden /> {t('account.noAccountJoin')}
           </button>
@@ -106,83 +56,13 @@ export function BackupCard({ showJoin = true }: { showJoin?: boolean }) {
 
         {joining && (
           <Sheet title={t('account.joinTitle')} onClose={() => setJoining(false)}>
-            <form onSubmit={join}>
-              <label className="field">
-                <span>{t('account.joinHint')}</span>
-                <input
-                  className="code-input"
-                  value={code}
-                  onChange={(e) => {
-                    setCode(cleanInviteCode(e.target.value))
-                    setError(null)
-                  }}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  autoFocus
-                />
-              </label>
-              {error && (
-                <p className="field-error" role="alert">
-                  {t(error)}
-                </p>
-              )}
-              <button type="submit" className="btn btn-primary" disabled={working || code.length < 6}>
-                {t('account.joinBtn')}
-              </button>
-            </form>
+            <JoinShopForm />
           </Sheet>
         )}
 
         {creating && (
           <Sheet title={`${t('backup.create')} / ${t('account.signIn')}`} onClose={() => setCreating(false)}>
-            <div className="segmented">
-              {(['create', 'signin'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={m === mode ? 'segment segment-on' : 'segment'}
-                  aria-pressed={m === mode}
-                  onClick={() => {
-                    setMode(m)
-                    setError(null)
-                  }}
-                >
-                  {m === 'create' ? t('backup.create') : t('account.signIn')}
-                </button>
-              ))}
-            </div>
-            <form onSubmit={create}>
-              <label className="field">
-                <span>{t('backup.email')}</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  autoFocus
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>{t('backup.password')}</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                  minLength={mode === 'signin' ? undefined : 8}
-                  required
-                />
-              </label>
-              {error && (
-                <p className="field-error" role="alert">
-                  {t(error)}
-                </p>
-              )}
-              <button type="submit" className="btn btn-primary" disabled={working}>
-                {mode === 'signin' ? t('account.signIn') : t('backup.create')}
-              </button>
-            </form>
+            <OwnerAccountForm personId={person.id} onDone={() => setCreating(false)} />
           </Sheet>
         )}
       </section>
@@ -212,6 +92,17 @@ export function BackupCard({ showJoin = true }: { showJoin?: boolean }) {
         {isWorkerLogin ? t('backup.workerPhone') : t('backup.signedIn', { email: sync.email ?? '' })}
         {sync.lastOkAt ? ` · ${t('backup.last', { time: dateTime(sync.lastOkAt) })}` : ''}
       </p>
+      {/* The server's own reason, so a failed sync can be reported and fixed. */}
+      {online && sync.failed && sync.problems.length > 0 && (
+        <details className="sync-problems">
+          <summary>{t('backup.why')}</summary>
+          <ul>
+            {sync.problems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
+          </ul>
+        </details>
+      )}
       <button type="button" className="btn btn-quiet" disabled={sync.busy || !online} onClick={() => void syncNow()}>
         <RefreshCw size={20} aria-hidden /> {t('backup.syncNow')}
       </button>

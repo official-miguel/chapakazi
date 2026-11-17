@@ -2,9 +2,13 @@
 // deployed. Only in development builds (npm run dev), and only when turned on by opening the
 // app with ?planDemo=1 (turn off with ?planDemo=0). It never exists in the real app.
 //
+// Open with ?planDemoExpire=1 to make the pretend plan run out now (to try the lock and the
+// 5 minutes).
+//
 // Pretend phone numbers:  ending in 0 = the owner cancels;  ending in 1 = no answer (times out);
 //                         anything else = paid after about 6 seconds.
 import type { PayStatus, PlanApi, PlanStatus, Quote } from './api'
+import { GRACE_MS } from './gate'
 import { periodTotal, planName, savingVsDaily, type Period, type PriceRow } from './pricing'
 
 const STATE_KEY = 'ck.planDemo.state'
@@ -40,6 +44,11 @@ interface State {
   period: Period | null
   inTrial: boolean
   expiresAt: number
+  /** Periods paid for, oldest first, and the shops paid for last time. */
+  paid?: Period[]
+  lastShops?: number
+  /** When the 5 minutes were started, by the end date they were for. */
+  grace?: Record<string, number>
 }
 interface Payment {
   id: string
@@ -58,6 +67,7 @@ function load(): State {
   }
   return { shops: 1, period: null, inTrial: true, expiresAt: Date.now() + 14 * DAY }
 }
+const iso = (ms: number) => new Date(ms).toISOString()
 const save = (s: State) => localStorage.setItem(STATE_KEY, JSON.stringify(s))
 const payments = new Map<string, Payment>()
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -85,6 +95,20 @@ function quote(period: Period | null, shops: number): Quote {
   }
 }
 
+/** The period paid for most often; on a tie, the one paid for most recently. */
+function usual(paid: Period[]): Period | null {
+  let best: Period | null = null
+  let bestCount = 0
+  for (let i = paid.length - 1; i >= 0; i--) {
+    const count = paid.filter((p) => p === paid[i]).length
+    if (count > bestCount) {
+      best = paid[i]
+      bestCount = count
+    }
+  }
+  return best
+}
+
 export const demoApi: PlanApi = {
   async prices() {
     await wait(300)
@@ -103,7 +127,19 @@ export const demoApi: PlanApi = {
       plan: planName(s.shops),
       period: s.period,
       owned_shops: 1,
+      usual_period: usual(s.paid ?? []),
+      usual_shops: s.lastShops ?? null,
+      grace_until: s.grace?.[iso(s.expiresAt)] ? iso(s.grace[iso(s.expiresAt)] + GRACE_MS) : null,
     }
+  },
+  async startGrace() {
+    await wait(250)
+    const s = load()
+    if (s.expiresAt > Date.now()) return { ok: false, error: 'not_ended' }
+    const key = iso(s.expiresAt)
+    s.grace = { [key]: s.grace?.[key] ?? Date.now() }
+    save(s)
+    return { ok: true, grace_until: iso(s.grace[key] + GRACE_MS) }
   },
   async quote(period, shops) {
     await wait(250)
@@ -131,6 +167,8 @@ export const demoApi: PlanApi = {
           s.expiresAt = new Date(p.quote.new_expires_at).getTime()
           s.period = p.quote.period
           s.inTrial = false
+          if (p.quote.period) s.paid = [...(s.paid ?? []), p.quote.period]
+          s.lastShops = p.quote.shops
         }
         s.shops = p.quote.shops
         save(s)
@@ -153,4 +191,11 @@ export function demoExpire() {
   s.expiresAt = Date.now() - 1000
   s.inTrial = false
   save(s)
+}
+
+// ?planDemoExpire=1 (development only, with the practice server on): the plan runs out now.
+try {
+  if (demoOn() && new URLSearchParams(location.search).get('planDemoExpire') === '1') demoExpire()
+} catch {
+  // Storage blocked: nothing to change.
 }

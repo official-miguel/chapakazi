@@ -1,10 +1,11 @@
-import { Check, Lock, Minus, Plus, RotateCcw, Smartphone, X } from 'lucide-react'
+import { Check, Clock, Lock, Minus, Plus, RotateCcw, Smartphone, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useI18n } from '../i18n'
 import type { WordKey } from '../i18n'
 import { useSession } from '../session'
-import { PayError, planApi, refreshPlan, usePlan } from '../subscription/api'
+import { beginGrace, PayError, planApi, refreshPlan, usePlan } from '../subscription/api'
+import { GRACE_MINUTES, usualChoice } from '../subscription/gate'
 import type { PayStatus, Quote } from '../subscription/api'
 import { formatKes, periodTotal, PERIODS, planName, savingVsDaily } from '../subscription/pricing'
 import type { Period, PlanName, PriceRow } from '../subscription/pricing'
@@ -44,7 +45,52 @@ const resultTitle: Record<Exclude<PayStatus['status'], 'pending' | 'success'>, W
 /** A Kenyan mobile number the way people type it: 07..., 01..., +254..., 254... */
 const phoneOk = (p: string) => /^(?:\+?254|0)?[17]\d{8}$/.test(p.replace(/[\s-]/g, ''))
 
+// The M-Pesa number last used to pay, so it need not be typed every time.
+const PAY_PHONE_KEY = 'ck.payPhone'
+function lastPayPhone(): string {
+  try {
+    return localStorage.getItem(PAY_PHONE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+function rememberPayPhone(phone: string) {
+  try {
+    localStorage.setItem(PAY_PHONE_KEY, phone.trim())
+  } catch {
+    // Not remembered; it is typed again next time.
+  }
+}
+
 type Step = 'shops' | 'period' | 'pay' | 'waiting' | 'done'
+
+/**
+ * Below the payment screen once the plan has ended: the choice to use the app for 5 minutes,
+ * once for each time the plan ends. Paying is always shown first.
+ */
+function GraceOffer({ used, businessId }: { used: boolean; businessId: string | null }) {
+  const { t } = useI18n()
+  const [starting, setStarting] = useState(false)
+  if (used) return <p className="card-note plan-grace-used">{t('grace.used', { n: GRACE_MINUTES })}</p>
+  return (
+    <section className="card plan-grace">
+      <h2 className="card-title">{t('grace.title')}</h2>
+      <p className="card-note">{t('grace.text', { n: GRACE_MINUTES })}</p>
+      <button
+        type="button"
+        className="btn btn-quiet"
+        disabled={starting}
+        onClick={async () => {
+          setStarting(true)
+          await beginGrace(businessId)
+          setStarting(false)
+        }}
+      >
+        <Clock size={20} aria-hidden /> {t('grace.btn', { n: GRACE_MINUTES })}
+      </button>
+    </section>
+  )
+}
 
 /**
  * Choose shops, choose a period, pay by M-Pesa. `locked` is the full-screen version shown when
@@ -54,16 +100,20 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
   const { t, lang } = useI18n()
   const { dir, person, views, business, ownsShop, lock } = useSession()
   const isOwner = views.some((v) => v.role === 'admin')
-  const { status } = usePlan(isOwner ? null : (business?.id ?? null), !locked)
+  const planFor = isOwner ? null : (business?.id ?? null)
+  const { status, graceUsed } = usePlan(planFor, !locked)
 
   const ownedShops = Math.max(1, dir.businesses.filter((b) => ownsShop(b.id)).length, status?.owned_shops ?? 0)
   const [prices, setPrices] = useState<PriceRow[] | null>(null)
   const [loadError, setLoadError] = useState<WordKey | null>(null)
   const [step, setStep] = useState<Step>('shops')
-  const [shops, setShops] = useState(() => Math.max(ownedShops, status?.shops ?? 1))
-  const [period, setPeriod] = useState<Period | null>('monthly')
+  // The plan they usually buy is offered first; "choose another" opens all of them.
+  const usual = usualChoice(status, ownedShops)
+  const [choosing, setChoosing] = useState(false)
+  const [shops, setShops] = useState(() => usual?.shops ?? Math.max(ownedShops, status?.shops ?? 1))
+  const [period, setPeriod] = useState<Period | null>(usual?.period ?? 'monthly')
   const [quote, setQuote] = useState<Quote | null>(null)
-  const [phone, setPhone] = useState(person?.phone ?? '')
+  const [phone, setPhone] = useState(() => lastPayPhone() || person?.phone || '')
   const [error, setError] = useState<WordKey | null>(null)
   const [busy, setBusy] = useState(false)
   const [payment, setPayment] = useState<PayStatus | null>(null)
@@ -108,6 +158,7 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
             <h1 className="screen-title">{t('plan.workerLockedTitle')}</h1>
             <p className="summary-text">{t('plan.workerLockedText')}</p>
           </section>
+          {locked && <GraceOffer used={graceUsed} businessId={planFor} />}
           {locked && (
             <button type="button" className="btn btn-quiet" onClick={lock}>
               <Lock size={20} aria-hidden /> {t('switch.lock')}
@@ -132,13 +183,14 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
     )
   }
 
-  const openPay = async (chosen: Period | null) => {
+  const openPay = async (chosen: Period | null, count = shops) => {
     setPeriod(chosen)
+    setShops(count)
     setStep('pay')
     setQuote(null)
     setError(null)
     try {
-      const q = await planApi.quote(chosen, shops)
+      const q = await planApi.quote(chosen, count)
       if (!q.ok) setError(startError(q.error ?? 'other'))
       setQuote(q)
     } catch (e) {
@@ -177,6 +229,7 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
     setError(null)
     try {
       const started = await planApi.start(period, shops, phone)
+      rememberPayPhone(phone)
       setPayment({ payment_id: started.payment_id, status: 'pending', amount: started.amount, receipt: null, result_code: null, expires_at: null })
       setStep('waiting')
       watch(started.payment_id)
@@ -188,6 +241,9 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
   }
 
   const stepNo = step === 'shops' ? 1 : step === 'period' ? 2 : 3
+  const showUsual = step === 'shops' && !choosing && usual !== null
+  const usualRow = usual ? prices?.find((p) => p.period === usual.period) : undefined
+  const usualPrice = usual && usualRow ? periodTotal(usualRow, usual.shops) : null
 
   const body = (
     <>
@@ -213,7 +269,26 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
 
       {loadError && <p className="field-error" role="alert">{t(loadError)}</p>}
 
-      {step !== 'waiting' && step !== 'done' && (
+      {/* The plan they usually buy, ready to pay in one tap. */}
+      {showUsual && usual && (
+        <section className="card plan-usual">
+          <p className="plan-now-label">{t('plan.usual')}</p>
+          <p className="plan-now-name">
+            {t(periodWord[usual.period])}
+            <span className="plan-now-shops"> · {t('plan.shopsN', { n: usual.shops })}</span>
+          </p>
+          {usualPrice !== null && <p className="plan-usual-price">{formatKes(usualPrice)} <span className="period-per">{t(perWord[usual.period])}</span></p>}
+          <button type="button" className="btn btn-primary btn-pay" disabled={!prices} onClick={() => openPay(usual.period, usual.shops)}>
+            <Smartphone size={22} aria-hidden />
+            {usualPrice !== null ? t('plan.payBtn', { amount: formatKes(usualPrice) }) : t('plan.working')}
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => setChoosing(true)}>
+            {t('plan.otherPlans')}
+          </button>
+        </section>
+      )}
+
+      {!showUsual && step !== 'waiting' && step !== 'done' && (
         <p className="plan-steps" aria-label={t('plan.stepOf', { n: stepNo })}>
           {[1, 2, 3].map((n) => (
             <span key={n} className={n <= stepNo ? 'plan-dot plan-dot-on' : 'plan-dot'} />
@@ -223,7 +298,7 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
       )}
 
       {/* Step 1: how many shops */}
-      {step === 'shops' && (
+      {step === 'shops' && !showUsual && (
         <section className="card">
           <h2 className="card-title">{t('plan.howManyShops')}</h2>
           <div className="stepper">
@@ -244,6 +319,11 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
           <button type="button" className="btn btn-primary" disabled={!prices} onClick={() => setStep('period')}>
             {t('common.next')}
           </button>
+          {usual && (
+            <button type="button" className="btn btn-quiet" onClick={() => setChoosing(false)}>
+              {t('common.back')}
+            </button>
+          )}
         </section>
       )}
 
@@ -256,10 +336,14 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
               <button
                 key={c.period}
                 type="button"
-                className={c.period === 'monthly' ? 'period-card period-best' : 'period-card'}
+                className={c.period === (usual?.period ?? 'monthly') ? 'period-card period-best' : 'period-card'}
                 onClick={() => openPay(c.period)}
               >
-                {c.period === 'monthly' && <span className="period-ribbon">{t('plan.bestValue')}</span>}
+                {c.period === usual?.period ? (
+                  <span className="period-ribbon">{t('plan.usualShort')}</span>
+                ) : (
+                  !usual && c.period === 'monthly' && <span className="period-ribbon">{t('plan.bestValue')}</span>
+                )}
                 <span className="period-name">{t(periodWord[c.period])}</span>
                 <span className="period-price">{formatKes(c.total)}</span>
                 <span className="period-per">{t(perWord[c.period])}</span>
@@ -342,6 +426,7 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
               onClick={() => {
                 if (locked) void refreshPlan(null)
                 setStep('shops')
+                setChoosing(false)
                 setPayment(null)
               }}
             >
@@ -359,6 +444,8 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
           </section>
         )
       )}
+
+      {locked && step !== 'waiting' && step !== 'done' && <GraceOffer used={graceUsed} businessId={planFor} />}
 
       {locked && (
         <button type="button" className="btn btn-quiet" onClick={lock}>

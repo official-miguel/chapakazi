@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { supabase } from '../supabase'
 import { demoApi, demoOn } from './demo'
+import { planView } from './gate'
 import type { Period, PlanName, PriceRow } from './pricing'
 
 export interface PlanStatus {
@@ -21,6 +22,12 @@ export interface PlanStatus {
   shops_change_at?: string | null
   period?: Period | null
   owned_shops?: number
+  /** The period this owner has paid for most often (the plan offered first). */
+  usual_period?: Period | null
+  /** How many shops they paid for last time. */
+  usual_shops?: number | null
+  /** When the 5 free minutes for the current end date end, if this login started them. */
+  grace_until?: string | null
 }
 
 export interface Quote {
@@ -64,6 +71,8 @@ export interface PlanApi {
   quote(period: Period | null, shops: number): Promise<Quote>
   start(period: Period | null, shops: number, phone: string): Promise<{ payment_id: string; amount: number }>
   check(paymentId: string): Promise<PayStatus>
+  /** Starts (or looks up) the 5 minutes of use after the plan has ended. */
+  startGrace(businessId: string | null): Promise<{ ok: boolean; error?: string; grace_until?: string }>
 }
 
 /** Reads the server's error code out of a failed server-function call. */
@@ -111,6 +120,12 @@ const serverApi: PlanApi = {
     if (error) throw new PayError(await errorCode(error))
     return data as PayStatus
   },
+  async startGrace(businessId) {
+    if (!supabase) throw new PayError('no_account')
+    const { data, error } = await supabase.rpc('ck_sub_grace_start', { p_business: businessId })
+    if (error) throw new PayError(navigator.onLine ? 'server_error' : 'offline')
+    return data
+  },
 }
 
 export const planApi: PlanApi = demoOn() ? demoApi : serverApi
@@ -118,24 +133,39 @@ export const planApi: PlanApi = demoOn() ? demoApi : serverApi
 // ---- the plan status, remembered on the phone ---------------------------------------------
 
 const CACHE_KEY = 'ck.plan'
-let cached: PlanStatus | null = (() => {
+const GRACE_KEY = 'ck.grace'
+
+function readJson<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
-    return raw ? (JSON.parse(raw) as PlanStatus) : null
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
   } catch {
     return null
   }
-})()
-const listeners = new Set<() => void>()
-
-function remember(status: PlanStatus | null) {
-  cached = status
+}
+function writeJson(key: string, value: unknown) {
   try {
-    if (status) localStorage.setItem(CACHE_KEY, JSON.stringify(status))
-    else localStorage.removeItem(CACHE_KEY)
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(value))
   } catch {
     // Not saved; it is fetched again next time.
   }
+}
+
+type Snapshot = {
+  status: PlanStatus | null
+  /** The last try to ask the server failed (offline, say). */
+  failed: boolean
+  /** When this phone started the 5 minutes, by the end date they were for. */
+  grace: Record<string, number>
+}
+let snap: Snapshot = { status: readJson<PlanStatus>(CACHE_KEY), failed: false, grace: readJson(GRACE_KEY) ?? {} }
+const listeners = new Set<() => void>()
+
+function update(change: Partial<Snapshot>) {
+  snap = { ...snap, ...change }
+  if ('status' in change) writeJson(CACHE_KEY, change.status ?? null)
+  if ('grace' in change) writeJson(GRACE_KEY, change.grace ?? null)
   listeners.forEach((l) => l())
 }
 
@@ -143,29 +173,49 @@ function remember(status: PlanStatus | null) {
 export async function refreshPlan(businessId: string | null): Promise<PlanStatus | null> {
   try {
     const status = await planApi.status(businessId)
-    remember(status)
+    update({ status, failed: false })
     return status
   } catch {
-    return cached
+    update({ failed: true })
+    return snap.status
   }
 }
 
 export function forgetPlan() {
-  remember(null)
+  update({ status: null, failed: false, grace: {} })
 }
 
 /**
- * The plan as last known, kept fresh while the app is open.
- * `locked` is true only when we KNOW the time has run out (a phone that has never heard from
- * the server is not locked).
+ * The person chose to use the app for 5 minutes after the plan ended. Counts at once on this
+ * phone (so it works offline) and is recorded by the server, which keeps it to once per end date
+ * for this login even across phones.
+ */
+export async function beginGrace(businessId: string | null): Promise<void> {
+  const endsAt = snap.status?.expires_at
+  if (!endsAt || snap.grace[endsAt] !== undefined) return
+  // Only one end date matters at a time, so older ones are dropped.
+  update({ grace: { [endsAt]: Date.now() } })
+  try {
+    const result = await planApi.startGrace(businessId)
+    if (result.ok && result.grace_until && snap.status?.expires_at === endsAt) {
+      update({ status: { ...snap.status, grace_until: result.grace_until } })
+    }
+  } catch {
+    // Offline: this phone's own record stands.
+  }
+}
+
+/**
+ * The plan as last known, kept fresh while the app is open (when `enabled`).
+ * `locked` is true only when we KNOW the time has run out and the 5 minutes are not running.
  */
 export function usePlan(businessId: string | null, enabled: boolean) {
-  const status = useSyncExternalStore(
+  const { status, failed, grace } = useSyncExternalStore(
     (l) => {
       listeners.add(l)
       return () => listeners.delete(l)
     },
-    () => cached,
+    () => snap,
   )
 
   const [now, setNow] = useState(() => Date.now())
@@ -186,9 +236,16 @@ export function usePlan(businessId: string | null, enabled: boolean) {
     }
   }, [enabled, refresh])
 
+  const view = planView(status, now, status ? (grace[status.expires_at] ?? null) : null)
+
+  // Wake exactly when the plan ends or the 5 minutes run out, not up to 30 seconds late.
   const endsAt = status ? new Date(status.expires_at).getTime() : null
-  const free = !!status?.exempt
-  const locked = !free && endsAt !== null && endsAt <= now
-  const endsSoon = !free && endsAt !== null && !locked && endsAt - now < 24 * 60 * 60 * 1000
-  return { status, locked, endsSoon, refresh }
+  const nextChange = view.inGrace ? view.graceUntil : endsAt !== null && endsAt > now ? endsAt : null
+  useEffect(() => {
+    if (nextChange === null || nextChange - Date.now() > 2 ** 31 - 1) return
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextChange - Date.now()) + 50)
+    return () => window.clearTimeout(timer)
+  }, [nextChange])
+
+  return { status, failed, ...view, refresh }
 }

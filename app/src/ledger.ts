@@ -1,6 +1,7 @@
 import { db, newId } from './db'
 import type { Entry, EntryData } from './db'
 import { applySaleLines } from './stock'
+import { assertCanAddEntry } from './freeLimit'
 
 // Recording, editing and cancelling ledger entries.
 // Rule: nothing is ever erased. Every change adds a new version next to the old ones.
@@ -69,6 +70,8 @@ export async function recordEntry(
   customerId?: string,
   source: Entry['source'] = 'typed',
 ): Promise<string> {
+  // A phone with no account gets only a few free entries.
+  await assertCanAddEntry()
   const now = Date.now()
   const id = newId()
   const fields = clean({ ...data, cancelled: false })

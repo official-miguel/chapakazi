@@ -121,19 +121,26 @@ export type SyncState = {
   /** The signed-in email, or null if this phone has no account yet. */
   email: string | null
   signedIn: boolean
+  /** False until the phone has looked whether it is signed in (it is quick, but not instant). */
+  checked: boolean
   busy: boolean
   failed: boolean
+  /** What the server said when the last sync failed, per table (for the Backup card). */
+  problems: string[]
   lastOkAt: number | null
   devicePersonId: string | null
 }
 
-let state: SyncState = { email: null, signedIn: false, busy: false, failed: false, lastOkAt: null, devicePersonId: getDevicePerson() }
+let state: SyncState = { email: null, signedIn: false, checked: !supabase, busy: false, failed: false, problems: [], lastOkAt: null, devicePersonId: getDevicePerson() }
 const listeners = new Set<() => void>()
 
 function emit(change: Partial<SyncState> = {}) {
   state = { ...state, ...change, devicePersonId: getDevicePerson() }
   listeners.forEach((l) => l())
 }
+
+/** The same as useSyncState, for code outside the screens. */
+export const getSyncState = (): SyncState => state
 
 export function useSyncState(): SyncState {
   return useSyncExternalStore(
@@ -327,6 +334,16 @@ async function recomputeTouched(touched: Touched): Promise<void> {
 
 // ---- running --------------------------------------------------------------------------------
 
+/**
+ * One line a person can read out or screenshot: which table, and the server's own words.
+ * "send ck_entries: new row violates row-level security policy (42501)"
+ */
+function describeProblem(step: string, table: string, error: unknown): string {
+  const e = error as { message?: string; code?: string; details?: string } | null
+  const message = e?.message || String(error)
+  return `${step}${table ? ' ' + table : ''}: ${message}${e?.code ? ` (${e.code})` : ''}`.slice(0, 300)
+}
+
 let running = false
 let again = false
 
@@ -339,12 +356,13 @@ export async function syncNow(): Promise<void> {
   }
   const { data } = await supabase.auth.getSession()
   const user = data.session?.user
-  emit({ signedIn: !!user, email: user?.email ?? null })
+  emit({ signedIn: !!user, email: user?.email ?? null, checked: true })
   if (!user || !navigator.onLine) return
 
   running = true
   emit({ busy: true })
   let failed = false
+  const problems: string[] = []
   const touched = new Touched()
   try {
     for (const spec of specs) {
@@ -354,6 +372,7 @@ export async function syncNow(): Promise<void> {
         if (spec.remote === 'ck_people') await claimDevicePerson(user.id)
       } catch (error) {
         failed = true
+        problems.push(describeProblem('send', spec.remote, error))
         console.warn(`[sync] sending ${spec.remote} failed`, error)
       }
     }
@@ -363,16 +382,18 @@ export async function syncNow(): Promise<void> {
         if (spec.remote === 'ck_memberships') await restartIfShopsChanged()
       } catch (error) {
         failed = true
+        problems.push(describeProblem('get', spec.remote, error))
         console.warn(`[sync] receiving ${spec.remote} failed`, error)
       }
     }
     await recomputeTouched(touched)
   } catch (error) {
     failed = true
+    problems.push(describeProblem('sync', '', error))
     console.warn('[sync] failed', error)
   } finally {
     running = false
-    emit({ busy: false, failed, lastOkAt: failed ? state.lastOkAt : Date.now() })
+    emit({ busy: false, failed, problems, lastOkAt: failed ? state.lastOkAt : Date.now() })
     if (again) {
       again = false
       void syncNow()
@@ -400,7 +421,7 @@ export function startSync(): void {
     if (document.visibilityState === 'visible') void syncNow()
   }, 60_000)
   supabase.auth.onAuthStateChange((_event, session) => {
-    emit({ signedIn: !!session, email: session?.user.email ?? null })
+    emit({ signedIn: !!session, email: session?.user.email ?? null, checked: true })
   })
   void syncNow()
 }
