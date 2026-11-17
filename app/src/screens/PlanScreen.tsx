@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { useI18n } from '../i18n'
 import type { WordKey } from '../i18n'
 import { useSession } from '../session'
-import { beginGrace, PayError, planApi, refreshPlan, usePlan } from '../subscription/api'
+import { beginGrace, choosePlan, PayError, planApi, refreshPlan, usePlan } from '../subscription/api'
 import { GRACE_MINUTES, usualChoice } from '../subscription/gate'
 import type { PayStatus, Quote } from '../subscription/api'
 import { formatKes, periodTotal, PERIODS, planName, savingVsDaily } from '../subscription/pricing'
@@ -101,14 +101,17 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
   const { dir, person, views, business, ownsShop, lock } = useSession()
   const isOwner = views.some((v) => v.role === 'admin')
   const planFor = isOwner ? null : (business?.id ?? null)
-  const { status, graceUsed } = usePlan(planFor, !locked)
+  const { status, graceUsed, choice } = usePlan(planFor, !locked)
 
   const ownedShops = Math.max(1, dir.businesses.filter((b) => ownsShop(b.id)).length, status?.owned_shops ?? 0)
   const [prices, setPrices] = useState<PriceRow[] | null>(null)
   const [loadError, setLoadError] = useState<WordKey | null>(null)
   const [step, setStep] = useState<Step>('shops')
-  // The plan they usually buy is offered first; "choose another" opens all of them.
-  const usual = usualChoice(status, ownedShops)
+  // The plan they usually buy (or chose during the trial) is offered first; "choose another"
+  // opens all of them.
+  const usual = usualChoice(status, ownedShops, choice)
+  // During the free trial, choosing a plan only saves it: nothing is paid until the trial ends.
+  const trialRunning = !locked && !!status?.in_trial && status.active
   const [choosing, setChoosing] = useState(false)
   const [shops, setShops] = useState(() => usual?.shops ?? Math.max(ownedShops, status?.shops ?? 1))
   const [period, setPeriod] = useState<Period | null>(usual?.period ?? 'monthly')
@@ -181,6 +184,21 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
         </section>
       </>
     )
+  }
+
+  /** In the trial: save the plan for after it. Nothing is charged. */
+  const saveChoice = async (chosen: Period) => {
+    setBusy(true)
+    setError(null)
+    const problem = await choosePlan(chosen, shops)
+    setBusy(false)
+    if (problem) {
+      setError(startError(problem))
+      return
+    }
+    setPeriod(chosen)
+    setChoosing(false)
+    setStep('shops')
   }
 
   const openPay = async (chosen: Period | null, count = shops) => {
@@ -272,23 +290,33 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
       {/* The plan they usually buy, ready to pay in one tap. */}
       {showUsual && usual && (
         <section className="card plan-usual">
-          <p className="plan-now-label">{t('plan.usual')}</p>
+          <p className="plan-now-label">
+            {t(trialRunning ? 'plan.afterTrial' : usual.source === 'chosen' ? 'plan.chosen' : 'plan.usual')}
+          </p>
           <p className="plan-now-name">
             {t(periodWord[usual.period])}
             <span className="plan-now-shops"> · {t('plan.shopsN', { n: usual.shops })}</span>
           </p>
           {usualPrice !== null && <p className="plan-usual-price">{formatKes(usualPrice)} <span className="period-per">{t(perWord[usual.period])}</span></p>}
-          <button type="button" className="btn btn-primary btn-pay" disabled={!prices} onClick={() => openPay(usual.period, usual.shops)}>
-            <Smartphone size={22} aria-hidden />
-            {usualPrice !== null ? t('plan.payBtn', { amount: formatKes(usualPrice) }) : t('plan.working')}
-          </button>
+          {trialRunning && status ? (
+            <p className="card-note plan-free-note">{t('plan.nothingNow', { date: date(status.expires_at) })}</p>
+          ) : (
+            <button type="button" className="btn btn-primary btn-pay" disabled={!prices} onClick={() => openPay(usual.period, usual.shops)}>
+              <Smartphone size={22} aria-hidden />
+              {usualPrice !== null ? t('plan.payBtn', { amount: formatKes(usualPrice) }) : t('plan.working')}
+            </button>
+          )}
           <button type="button" className="btn btn-quiet" onClick={() => setChoosing(true)}>
-            {t('plan.otherPlans')}
+            {t(trialRunning ? 'plan.changePlan' : 'plan.otherPlans')}
           </button>
         </section>
       )}
 
-      {!showUsual && step !== 'waiting' && step !== 'done' && (
+      {trialRunning && !showUsual && status && (
+        <p className="card-note plan-free-note">{t('plan.trialChoose', { date: date(status.expires_at) })}</p>
+      )}
+
+      {!showUsual && !trialRunning && step !== 'waiting' && step !== 'done' && (
         <p className="plan-steps" aria-label={t('plan.stepOf', { n: stepNo })}>
           {[1, 2, 3].map((n) => (
             <span key={n} className={n <= stepNo ? 'plan-dot plan-dot-on' : 'plan-dot'} />
@@ -330,17 +358,19 @@ export function PlanScreen({ locked = false }: { locked?: boolean }) {
       {/* Step 2: day, week or month */}
       {step === 'period' && (
         <>
-          <h2 className="card-title plan-h2">{t('plan.howLong', { n: shops })}</h2>
+          <h2 className="card-title plan-h2">{t(trialRunning ? 'plan.howLongTrial' : 'plan.howLong', { n: shops })}</h2>
+          {error && trialRunning && <p className="field-error" role="alert">{t(error)}</p>}
           <div className="period-cards">
             {cards.map((c) => (
               <button
                 key={c.period}
                 type="button"
                 className={c.period === (usual?.period ?? 'monthly') ? 'period-card period-best' : 'period-card'}
-                onClick={() => openPay(c.period)}
+                disabled={busy}
+                onClick={() => (trialRunning ? saveChoice(c.period) : openPay(c.period))}
               >
                 {c.period === usual?.period ? (
-                  <span className="period-ribbon">{t('plan.usualShort')}</span>
+                  <span className="period-ribbon">{t(usual.source === 'chosen' ? 'plan.chosenShort' : 'plan.usualShort')}</span>
                 ) : (
                   !usual && c.period === 'monthly' && <span className="period-ribbon">{t('plan.bestValue')}</span>
                 )}

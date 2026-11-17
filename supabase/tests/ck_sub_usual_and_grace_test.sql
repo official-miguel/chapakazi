@@ -1,5 +1,5 @@
--- CHAPA KAZI: checks for the usual plan and the 5 minutes after a plan ends (migration 0013).
--- Run as one block in the SQL editor, after migrations 0011-0013. Everything is rolled back at
+-- CHAPA KAZI: checks for the usual plan, the 5 minutes after a plan ends (0013) and choosing a plan in the trial (0014).
+-- Run as one block in the SQL editor, after migrations 0011-0014. Everything is rolled back at
 -- the end; nothing is kept. Any failed check stops with an error saying which one.
 begin;
 
@@ -72,7 +72,16 @@ begin
   g := public.ck_sub_grace_start(null);
   assert not (g ->> 'ok')::boolean, 'free account: ' || g;
 
-  raise notice 'All usual-plan and 5-minute checks passed.';
+  -- 8. Choosing a plan (migration 0014) charges nothing and is remembered.
+  g := public.ck_sub_choose('weekly', 2);
+  assert (g ->> 'ok')::boolean, 'choose a plan: ' || g;
+  st := public.ck_sub_status(null);
+  assert st ->> 'chosen_period' = 'weekly' and (st ->> 'chosen_shops')::int = 2, 'chosen plan remembered: ' || st;
+  assert (select count(*) from public.ck_sub_payments where owner_uid = v_owner) = 3, 'choosing makes no payment';
+  g := public.ck_sub_choose('yearly', 1);
+  assert not (g ->> 'ok')::boolean, 'unknown period refused: ' || g;
+
+  raise notice 'All usual-plan, 5-minute and chosen-plan checks passed.';
 end $$;
 
 rollback;

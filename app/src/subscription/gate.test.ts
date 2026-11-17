@@ -56,20 +56,31 @@ describe('planView: when the app opens', () => {
 })
 
 describe('usualChoice: the plan offered first', () => {
-  it('is nothing before the first payment (trial only)', () => {
+  it('is nothing during the trial until they choose', () => {
     expect(usualChoice(status({ in_trial: true, period: null }), 1)).toBeNull()
   })
 
-  it('is the period paid for most, for the shops paid for last', () => {
-    expect(usualChoice(status({ period: 'weekly', usual_period: 'monthly', usual_shops: 3 }), 1)).toEqual({ period: 'monthly', shops: 3 })
+  it('during or right after the trial: the plan they chose, without having paid', () => {
+    const chosen = status({ in_trial: true, chosen_period: 'weekly', chosen_shops: 2, chosen_at: iso(NOW - 1000) })
+    expect(usualChoice(chosen, 1)).toEqual({ period: 'weekly', shops: 2, source: 'chosen' })
+    // Chosen on this phone while offline (the server does not know yet).
+    expect(usualChoice(status({ in_trial: true }), 1, { period: 'daily', shops: 1, at: NOW })).toEqual({ period: 'daily', shops: 1, source: 'chosen' })
+    // The newer choice wins, whichever side has it.
+    expect(usualChoice(chosen, 1, { period: 'monthly', shops: 1, at: NOW - 5000 })).toMatchObject({ period: 'weekly' })
+    expect(usualChoice(chosen, 1, { period: 'monthly', shops: 1, at: NOW })).toMatchObject({ period: 'monthly' })
+  })
+
+  it('after paying: the period paid for most, for the shops paid for last', () => {
+    expect(usualChoice(status({ period: 'weekly', usual_period: 'monthly', usual_shops: 3 }), 1)).toEqual({ period: 'monthly', shops: 3, source: 'usual' })
   })
 
   it('falls back to the last period paid for (older server)', () => {
-    expect(usualChoice(status({ period: 'daily', shops: 2 }), 1)).toEqual({ period: 'daily', shops: 2 })
+    expect(usualChoice(status({ period: 'daily', shops: 2 }), 1)).toEqual({ period: 'daily', shops: 2, source: 'usual' })
   })
 
   it('is never fewer shops than the owner has now', () => {
-    expect(usualChoice(status({ usual_period: 'weekly', usual_shops: 1 }), 4)).toEqual({ period: 'weekly', shops: 4 })
+    expect(usualChoice(status({ usual_period: 'weekly', usual_shops: 1 }), 4)).toEqual({ period: 'weekly', shops: 4, source: 'usual' })
+    expect(usualChoice(status({ in_trial: true }), 3, { period: 'daily', shops: 1, at: NOW })).toMatchObject({ shops: 3 })
   })
 })
 

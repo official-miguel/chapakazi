@@ -7,7 +7,7 @@
 //   * When the time runs out the app locks and shows the payment screen. Below it, the person
 //     may choose to use the app for 5 minutes, once for each time the plan runs out.
 //   * The plan they bought most is offered first next time, with the others one tap away.
-import type { PlanStatus } from './api'
+import type { PlanChoice, PlanStatus } from './api'
 import type { Period } from './pricing'
 
 export const GRACE_MINUTES = 5
@@ -60,14 +60,29 @@ export function planView(status: PlanStatus | null, now: number, localGraceStart
   }
 }
 
+export type OfferedPlan = { period: Period; shops: number; source: 'chosen' | 'usual' }
+
 /**
- * The plan to offer first: the period they paid for most (else the last one), for the shops they
- * last paid for, never fewer than the shops they own. Null if they have never paid.
+ * The plan to offer first, never for fewer shops than they own:
+ *   - still on the free trial (never paid): the plan they chose during it, if they chose one
+ *     (the newer of this phone's choice and the server's);
+ *   - after paying: the period they paid for most (else the last one), for the shops they last
+ *     paid for.
+ * Null if there is nothing to offer yet.
  */
-export function usualChoice(status: PlanStatus | null, ownedShops: number): { period: Period; shops: number } | null {
-  const period = status?.usual_period ?? status?.period ?? null
+export function usualChoice(status: PlanStatus | null, ownedShops: number, phoneChoice: PlanChoice | null = null): OfferedPlan | null {
+  const atLeast = (n: number | null | undefined) => Math.max(1, ownedShops, n ?? 1)
+  if (!status || status.in_trial) {
+    const fromServer =
+      status?.chosen_period && status.chosen_at
+        ? { period: status.chosen_period, shops: status.chosen_shops ?? 1, at: Date.parse(status.chosen_at) }
+        : null
+    const newest = [fromServer, phoneChoice].filter((c) => c !== null).sort((a, b) => b.at - a.at)[0]
+    return newest ? { period: newest.period, shops: atLeast(newest.shops), source: 'chosen' } : null
+  }
+  const period = status.usual_period ?? status.period ?? null
   if (!period) return null
-  return { period, shops: Math.max(1, ownedShops, status?.usual_shops ?? status?.shops ?? 1) }
+  return { period, shops: atLeast(status.usual_shops ?? status.shops), source: 'usual' }
 }
 
 /** "4:05" */

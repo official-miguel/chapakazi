@@ -49,6 +49,8 @@ interface State {
   lastShops?: number
   /** When the 5 minutes were started, by the end date they were for. */
   grace?: Record<string, number>
+  /** The plan chosen during the trial. */
+  chosen?: { period: Period; shops: number; at: number }
 }
 interface Payment {
   id: string
@@ -130,7 +132,17 @@ export const demoApi: PlanApi = {
       usual_period: usual(s.paid ?? []),
       usual_shops: s.lastShops ?? null,
       grace_until: s.grace?.[iso(s.expiresAt)] ? iso(s.grace[iso(s.expiresAt)] + GRACE_MS) : null,
+      chosen_period: s.chosen?.period ?? null,
+      chosen_shops: s.chosen?.shops ?? null,
+      chosen_at: s.chosen ? iso(s.chosen.at) : null,
     }
+  },
+  async choose(period, shops) {
+    await wait(250)
+    const s = load()
+    s.chosen = { period, shops, at: Date.now() }
+    save(s)
+    return { ok: true }
   },
   async startGrace() {
     await wait(250)
@@ -189,7 +201,7 @@ export const demoApi: PlanApi = {
 export function demoExpire() {
   const s = load()
   s.expiresAt = Date.now() - 1000
-  s.inTrial = false
+  // Like the real server: an account stays "in trial" until its first payment.
   save(s)
 }
 

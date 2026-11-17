@@ -2418,3 +2418,13 @@ a.btn {
   width: 100%;
   text-decoration: none;
 }
+
+/* During the free trial: choosing a plan costs nothing now. */
+.plan-free-note {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: var(--green-ink);
+  font-weight: 500;
+}

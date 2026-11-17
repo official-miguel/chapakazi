@@ -28,7 +28,14 @@ export interface PlanStatus {
   usual_shops?: number | null
   /** When the 5 free minutes for the current end date end, if this login started them. */
   grace_until?: string | null
+  /** The plan chosen during the free trial (nothing paid yet), offered first when it ends. */
+  chosen_period?: Period | null
+  chosen_shops?: number | null
+  chosen_at?: string | null
 }
+
+/** A plan chosen during the trial, kept on the phone too (works offline). */
+export type PlanChoice = { period: Period; shops: number; at: number }
 
 export interface Quote {
   ok: boolean
@@ -73,6 +80,8 @@ export interface PlanApi {
   check(paymentId: string): Promise<PayStatus>
   /** Starts (or looks up) the 5 minutes of use after the plan has ended. */
   startGrace(businessId: string | null): Promise<{ ok: boolean; error?: string; grace_until?: string }>
+  /** Remembers the plan chosen during the trial. Charges nothing. */
+  choose(period: Period, shops: number): Promise<{ ok: boolean; error?: string }>
 }
 
 /** Reads the server's error code out of a failed server-function call. */
@@ -126,6 +135,12 @@ const serverApi: PlanApi = {
     if (error) throw new PayError(navigator.onLine ? 'server_error' : 'offline')
     return data
   },
+  async choose(period, shops) {
+    if (!supabase) throw new PayError('no_account')
+    const { data, error } = await supabase.rpc('ck_sub_choose', { p_period: period, p_shops: shops })
+    if (error) throw new PayError(navigator.onLine ? 'server_error' : 'offline')
+    return data
+  },
 }
 
 export const planApi: PlanApi = demoOn() ? demoApi : serverApi
@@ -134,6 +149,7 @@ export const planApi: PlanApi = demoOn() ? demoApi : serverApi
 
 const CACHE_KEY = 'ck.plan'
 const GRACE_KEY = 'ck.grace'
+const CHOICE_KEY = 'ck.planChoice'
 
 function readJson<T>(key: string): T | null {
   try {
@@ -158,14 +174,22 @@ type Snapshot = {
   failed: boolean
   /** When this phone started the 5 minutes, by the end date they were for. */
   grace: Record<string, number>
+  /** The plan chosen on this phone during the trial. */
+  choice: PlanChoice | null
 }
-let snap: Snapshot = { status: readJson<PlanStatus>(CACHE_KEY), failed: false, grace: readJson(GRACE_KEY) ?? {} }
+let snap: Snapshot = {
+  status: readJson<PlanStatus>(CACHE_KEY),
+  failed: false,
+  grace: readJson(GRACE_KEY) ?? {},
+  choice: readJson<PlanChoice>(CHOICE_KEY),
+}
 const listeners = new Set<() => void>()
 
 function update(change: Partial<Snapshot>) {
   snap = { ...snap, ...change }
   if ('status' in change) writeJson(CACHE_KEY, change.status ?? null)
   if ('grace' in change) writeJson(GRACE_KEY, change.grace ?? null)
+  if ('choice' in change) writeJson(CHOICE_KEY, change.choice ?? null)
   listeners.forEach((l) => l())
 }
 
@@ -182,7 +206,7 @@ export async function refreshPlan(businessId: string | null): Promise<PlanStatus
 }
 
 export function forgetPlan() {
-  update({ status: null, failed: false, grace: {} })
+  update({ status: null, failed: false, grace: {}, choice: null })
 }
 
 /**
@@ -206,11 +230,28 @@ export async function beginGrace(businessId: string | null): Promise<void> {
 }
 
 /**
+ * The owner chose the plan they want after the trial. Nothing is charged: it is remembered on
+ * this phone at once and on the server (so their other phones know), and offered first when the
+ * trial ends. Returns an error code if the server refused it (for example fewer shops than owned).
+ */
+export async function choosePlan(period: Period, shops: number): Promise<string | null> {
+  update({ choice: { period, shops, at: Date.now() } })
+  try {
+    const result = await planApi.choose(period, shops)
+    if (!result.ok) return result.error ?? 'other'
+    void refreshPlan(null)
+  } catch {
+    // Offline, or the server is not updated yet: this phone's own record stands.
+  }
+  return null
+}
+
+/**
  * The plan as last known, kept fresh while the app is open (when `enabled`).
  * `locked` is true only when we KNOW the time has run out and the 5 minutes are not running.
  */
 export function usePlan(businessId: string | null, enabled: boolean) {
-  const { status, failed, grace } = useSyncExternalStore(
+  const { status, failed, grace, choice } = useSyncExternalStore(
     (l) => {
       listeners.add(l)
       return () => listeners.delete(l)
@@ -247,5 +288,5 @@ export function usePlan(businessId: string | null, enabled: boolean) {
     return () => window.clearTimeout(timer)
   }, [nextChange])
 
-  return { status, failed, ...view, refresh }
+  return { status, failed, choice, ...view, refresh }
 }
