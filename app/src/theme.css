@@ -2388,3 +2388,33 @@ a.btn {
   color: var(--green-ink);
   font-weight: 600;
 }
+
+/* On the old address: how to move to the new one without losing records. */
+.move-banner {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 14px;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  background: #fffbeb;
+}
+
+.move-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #7c3a06;
+  font-weight: 600;
+}
+
+.move-text {
+  margin: 0;
+  font-size: 15px;
+}
+
+.move-banner .btn {
+  width: 100%;
+  text-decoration: none;
+}

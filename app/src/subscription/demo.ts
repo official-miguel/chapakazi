@@ -18,7 +18,7 @@ const DAY = 86_400_000
  * A practice switch, only in development builds: ?<name>=1 turns it on (remembered), ?<name>=0 off.
  * planDemo = pretend payment server for owners; adminDemo = made-up rows in Super admin.
  */
-export function demoFlag(name: 'planDemo' | 'adminDemo'): boolean {
+export function demoFlag(name: 'planDemo' | 'adminDemo' | 'moveDemo'): boolean {
   if (!import.meta.env.DEV) return false
   const key = 'ck.' + name
   try {

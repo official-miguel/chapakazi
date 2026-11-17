@@ -8,6 +8,7 @@ import type { View } from '../session'
 import { useSyncState } from '../sync'
 import { useOnline } from '../useOnline'
 import { usePendingCount } from './BackupCard'
+import { MoveBanner } from './MoveBanner'
 import { PlanBanner } from './PlanBanner'
 import { Sheet } from './Sheet'
 import { VoiceSheet } from './VoiceSheet'
@@ -68,6 +69,7 @@ export function Layout() {
       </header>
 
       <main className="content">
+        <MoveBanner />
         <PlanBanner />
         <Outlet />
       </main>
